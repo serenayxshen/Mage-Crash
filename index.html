@@ -505,7 +505,7 @@
           badge: '通用强化',
           icon: '👟',
           title: '疾风步',
-          desc: '移动速度 +15%，经验拾取范围 +30%',
+          desc: '移动速度 +15%, 经验拾取范围 +30%',
           apply: () => {
             player.speed *= 1.15;
             player.pickupRadius *= 1.3;
@@ -520,6 +520,31 @@
           apply: () => {
             player.maxHp += 30;
             player.hp = Math.min(player.maxHp, player.hp + player.maxHp * 0.5);
+          }
+        },
+        // ==========================================
+        // 🐾 新增：暗夜小灰狼宠物召唤卡
+        // ==========================================
+        {
+          isSkill: true,
+          badge: '✨ 解锁宠物',
+          icon: '🐺',
+          title: '暗夜小灰狼',
+          desc: '召唤一只极速撕咬的近战暗夜灰狼。阵亡后需 60 秒复活且属性清零。',
+          apply: () => {
+            // 如果玩家还没宠物，就直接实例化一只小灰狼
+            if (typeof activePet === 'undefined' || !activePet) {
+              activePet = new Pet('wolf', '暗夜小灰狼');
+              activePet.x = player.x + 20;
+              activePet.y = player.y + 20;
+              console.log("成功召唤：暗夜小灰狼！");
+            } else {
+              // 如果已经有了，可以升级宠物的攻击力或血量（后面我们还可以扩展宠物升级逻辑）
+              activePet.attack += 5;
+              activePet.maxHp += 20;
+              activePet.hp += 20;
+              console.log("小灰狼得到强化！攻击力提高。");
+            }
           }
         }
       ];
