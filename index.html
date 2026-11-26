@@ -354,8 +354,8 @@
     let enemies = [];
     let gems = [];
     let particles = [];
-    let lightnings = []; // 闪电特效数组
-    let frostWaves = []; // 冰霜新星扩散环
+    let lightnings = [];
+    let frostWaves = [];
 
     // 输入控制
     const keys = {};
@@ -393,10 +393,9 @@
       joystick.dy = 0;
     });
 
-    // 动态生成升级卡牌池（支持新技能解锁 + 技能升级 + 基础属性）
+    // 动态生成升级卡牌池
     function getAvailableUpgrades() {
       const pool = [
-        // 1. 奥术飞弹强化
         {
           isSkill: true,
           badge: `奥术飞弹 Lv.${player.skills.missile + 1}`,
@@ -409,7 +408,6 @@
             player.damage = Math.round(player.damage * 1.15);
           }
         },
-        // 2. 火焰法典（环绕火球）
         {
           isSkill: true,
           badge: player.skills.fireOrb === 0 ? '✨ 解锁新魔法' : `火焰法典 Lv.${player.skills.fireOrb + 1}`,
@@ -430,7 +428,6 @@
             }
           }
         },
-        // 3. 雷暴法阵（随机天雷）
         {
           isSkill: true,
           badge: player.skills.thunder === 0 ? '✨ 解锁新魔法' : `雷暴法阵 Lv.${player.skills.thunder + 1}`,
@@ -450,7 +447,6 @@
             }
           }
         },
-        // 4. 冰霜新星（范围冻结）
         {
           isSkill: true,
           badge: player.skills.frost === 0 ? '✨ 解锁新魔法' : `冰霜新星 Lv.${player.skills.frost + 1}`,
@@ -470,7 +466,6 @@
             }
           }
         },
-        // 5. 通用强化
         {
           isSkill: false,
           badge: '通用强化',
@@ -509,9 +504,67 @@
       return pool;
     }
 
-    // 确保开始按钮百分之百能点开的保险函数
+    function initGame() {
+      player = {
+        x: canvas.width / 2,
+        y: canvas.height / 2,
+        radius: 16,
+        speed: 215,
+        hp: 100,
+        maxHp: 100,
+        level: 1,
+        xp: 0,
+        nextXp: 8,
+        pickupRadius: 80,
+        invulnTimer: 0,
+
+        skills: {
+          missile: 1,
+          fireOrb: 0,
+          thunder: 0,
+          frost: 0
+        },
+
+        fireCooldown: 0.62,
+        fireTimer: 0,
+        damage: 14,
+        projectileCount: 1,
+        projectileSpeed: 470,
+
+        fireOrbCount: 0,
+        fireOrbAngle: 0,
+        fireOrbRadius: 72,
+        fireOrbSpeed: 2.8,
+        fireOrbDamage: 16,
+
+        thunderCooldown: 2.4,
+        thunderTimer: 0.5,
+        thunderCount: 1,
+        thunderDamage: 38,
+
+        frostCooldown: 4.2,
+        frostTimer: 1.0,
+        frostRadius: 155,
+        frostDamage: 12
+      };
+
+      bullets = [];
+      enemies = [];
+      gems = [];
+      particles = [];
+      lightnings = [];
+      frostWaves = [];
+      elapsedTime = 0;
+      kills = 0;
+      spawnTimer = 0;
+      updateHUD();
+    }
+
+    // 绑定开始按钮事件（使用安全的事件监听，确保100%响应点击）
+    document.getElementById('start-btn').addEventListener('click', startGame);
+    document.getElementById('restart-btn').addEventListener('click', startGame);
+
     function startGame() {
-      // 首次点击时安全唤醒音频上下文，防止浏览器拦截卡死
       try {
         if (!audioCtx) {
           audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -531,35 +584,480 @@
       lastTime = performance.now();
       requestAnimationFrame(gameLoop);
     }
-    
-    function initGame() {
-      player = {
-        x: canvas.width / 2,
-        y: canvas.height / 2,
-        radius: 16,
-        speed: 215,
-        hp: 100,
-        maxHp: 100,
-        level: 1,
-        xp: 0,
-        nextXp: 8,
-        pickupRadius: 80,
-        invulnTimer: 0,
 
-        // 技能等级记录
-        skills: {
-          missile: 1,
-          fireOrb: 0,
-          thunder: 0,
-          frost: 0
-        },
+    function triggerLevelUp() {
+      gameState = 'LEVELUP';
+      playSound('levelup');
+      cardsBox.innerHTML = '';
 
-        // 技能1：奥术飞弹
-        fireCooldown: 0.62,
-        fireTimer: 0,
-        damage: 14,
-        projectileCount: 1,
-        projectileSpeed: 470,
+      const pool = getAvailableUpgrades();
+      const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, 3);
 
-        // 技能2：火焰法典（环绕火球）
-        fireOrbCount:
+      shuffled.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'upgrade-card' + (item.isSkill ? ' new-skill' : '');
+        card.innerHTML = `
+          <span class="card-badge">${item.badge}</span>
+          <div class="card-icon">${item.icon}</div>
+          <div class="card-title">${item.title}</div>
+          <div class="card-desc">${item.desc}</div>
+        `;
+        card.onclick = () => {
+          item.apply();
+          levelupScreen.classList.add('hidden');
+          updateHUD();
+          gameState = 'PLAYING';
+          lastTime = performance.now();
+          requestAnimationFrame(gameLoop);
+        };
+        cardsBox.appendChild(card);
+      });
+
+      levelupScreen.classList.remove('hidden');
+    }
+
+    function spawnEnemy() {
+      const margin = 40;
+      let x, y;
+      const side = Math.floor(Math.random() * 4);
+      if (side === 0) { x = Math.random() * canvas.width; y = -margin; }
+      else if (side === 1) { x = canvas.width + margin; y = Math.random() * canvas.height; }
+      else if (side === 2) { x = Math.random() * canvas.width; y = canvas.height + margin; }
+      else { x = -margin; y = Math.random() * canvas.height; }
+
+      const difficulty = 1 + elapsedTime / 42;
+      const isBig = Math.random() < Math.min(0.28, elapsedTime / 160);
+
+      enemies.push({
+        x,
+        y,
+        radius: isBig ? 22 : 13,
+        speed: isBig ? 65 : (85 + Math.random() * 25),
+        hp: Math.round((isBig ? 55 : 18) * difficulty),
+        maxHp: Math.round((isBig ? 55 : 18) * difficulty),
+        color: isBig ? '#f43f5e' : '#4ade80',
+        xpValue: isBig ? 5 : 2,
+        hitFlash: 0,
+        orbHitCooldown: 0,
+        slowTimer: 0
+      });
+    }
+
+    function damageEnemy(e, dmg, knockbackX = 0, knockbackY = 0) {
+      e.hp -= dmg;
+      e.hitFlash = 0.08;
+      e.x += knockbackX;
+      e.y += knockbackY;
+      if (e.hp <= 0 && !e.dead) {
+        e.dead = true;
+        playSound('hit');
+        spawnParticles(e.x, e.y, e.color, 8);
+        gems.push({ x: e.x, y: e.y, value: e.xpValue });
+        kills++;
+      }
+    }
+
+    function spawnParticles(x, y, color, count = 6) {
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 50 + Math.random() * 120;
+        particles.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 0.35 + Math.random() * 0.2,
+          maxLife: 0.55,
+          color,
+          size: 3 + Math.random() * 3
+        });
+      }
+    }
+
+    function update(dt) {
+      elapsedTime += dt;
+
+      let moveX = joystick.dx;
+      let moveY = joystick.dy;
+      if (keys['w'] || keys['arrowup']) moveY -= 1;
+      if (keys['s'] || keys['arrowdown']) moveY += 1;
+      if (keys['a'] || keys['arrowleft']) moveX -= 1;
+      if (keys['d'] || keys['arrowright']) moveX += 1;
+
+      const len = Math.hypot(moveX, moveY);
+      if (len > 1) {
+        moveX /= len;
+        moveY /= len;
+      }
+
+      player.x += moveX * player.speed * dt;
+      player.y += moveY * player.speed * dt;
+      player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
+      player.y = Math.max(player.radius + 55, Math.min(canvas.height - player.radius, player.y));
+
+      if (player.invulnTimer > 0) player.invulnTimer -= dt;
+
+      // 技能1：奥术飞弹
+      player.fireTimer -= dt;
+      if (player.fireTimer <= 0 && enemies.length > 0) {
+        let nearest = null;
+        let minDist = Infinity;
+        for (const e of enemies) {
+          const d = Math.hypot(e.x - player.x, e.y - player.y);
+          if (d < minDist) {
+            minDist = d;
+            nearest = e;
+          }
+        }
+        if (nearest) {
+          const baseAngle = Math.atan2(nearest.y - player.y, nearest.x - player.x);
+          const spread = 0.16;
+          for (let i = 0; i < player.projectileCount; i++) {
+            const offset = (i - (player.projectileCount - 1) / 2) * spread;
+            const angle = baseAngle + offset;
+            bullets.push({
+              x: player.x,
+              y: player.y,
+              vx: Math.cos(angle) * player.projectileSpeed,
+              vy: Math.sin(angle) * player.projectileSpeed,
+              radius: 6,
+              damage: player.damage,
+              life: 1.8
+            });
+          }
+          playSound('shoot');
+          player.fireTimer = player.fireCooldown;
+        }
+      }
+
+      // 技能2：火焰法典
+      if (player.skills.fireOrb > 0) {
+        player.fireOrbAngle += player.fireOrbSpeed * dt;
+        for (let i = 0; i < player.fireOrbCount; i++) {
+          const angle = player.fireOrbAngle + (Math.PI * 2 / player.fireOrbCount) * i;
+          const orbX = player.x + Math.cos(angle) * player.fireOrbRadius;
+          const orbY = player.y + Math.sin(angle) * player.fireOrbRadius;
+
+          for (const e of enemies) {
+            if (e.dead || e.orbHitCooldown > 0) continue;
+            if (Math.hypot(orbX - e.x, orbY - e.y) < 11 + e.radius) {
+              const pushAngle = Math.atan2(e.y - player.y, e.x - player.x);
+              damageEnemy(e, player.fireOrbDamage, Math.cos(pushAngle) * 14, Math.sin(pushAngle) * 14);
+              e.orbHitCooldown = 0.35;
+              spawnParticles(orbX, orbY, '#fb923c', 4);
+            }
+          }
+        }
+      }
+
+      // 技能3：雷暴法阵
+      if (player.skills.thunder > 0) {
+        player.thunderTimer -= dt;
+        if (player.thunderTimer <= 0 && enemies.length > 0) {
+          player.thunderTimer = player.thunderCooldown;
+          playSound('thunder');
+          for (let k = 0; k < player.thunderCount; k++) {
+            const target = enemies[Math.floor(Math.random() * enemies.length)];
+            if (target) {
+              lightnings.push({ x: target.x, y: target.y, life: 0.25, maxLife: 0.25 });
+              spawnParticles(target.x, target.y, '#facc15', 10);
+              for (const e of enemies) {
+                if (!e.dead && Math.hypot(e.x - target.x, e.y - target.y) < 55 + e.radius) {
+                  damageEnemy(e, player.thunderDamage);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 技能4：冰霜新星
+      if (player.skills.frost > 0) {
+        player.frostTimer -= dt;
+        if (player.frostTimer <= 0) {
+          player.frostTimer = player.frostCooldown;
+          playSound('frost');
+          frostWaves.push({ x: player.x, y: player.y, radius: 10, maxRadius: player.frostRadius, life: 0.35 });
+          for (const e of enemies) {
+            if (!e.dead && Math.hypot(e.x - player.x, e.y - player.y) < player.frostRadius + e.radius) {
+              e.slowTimer = 2.8;
+              damageEnemy(e, player.frostDamage);
+            }
+          }
+        }
+      }
+
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        b.life -= dt;
+        if (b.life <= 0) {
+          bullets.splice(i, 1);
+          continue;
+        }
+        for (const e of enemies) {
+          if (!e.dead && Math.hypot(b.x - e.x, b.y - e.y) < b.radius + e.radius) {
+            damageEnemy(e, b.damage);
+            spawnParticles(b.x, b.y, '#60a5fa', 3);
+            bullets.splice(i, 1);
+            break;
+          }
+        }
+      }
+
+      enemies = enemies.filter(e => !e.dead);
+
+      spawnTimer -= dt;
+      const spawnInterval = Math.max(0.16, 0.9 - elapsedTime * 0.008);
+      if (spawnTimer <= 0) {
+        spawnEnemy();
+        spawnTimer = spawnInterval;
+      }
+
+      for (const e of enemies) {
+        if (e.hitFlash > 0) e.hitFlash -= dt;
+        if (e.orbHitCooldown > 0) e.orbHitCooldown -= dt;
+        if (e.slowTimer > 0) e.slowTimer -= dt;
+
+        const speedFactor = e.slowTimer > 0 ? 0.4 : 1.0;
+        const angle = Math.atan2(player.y - e.y, player.x - e.x);
+        e.x += Math.cos(angle) * e.speed * speedFactor * dt;
+        e.y += Math.sin(angle) * e.speed * speedFactor * dt;
+
+        const dist = Math.hypot(player.x - e.x, player.y - e.y);
+        if (dist < player.radius + e.radius) {
+          if (player.invulnTimer <= 0) {
+            player.hp -= 12;
+            player.invulnTimer = 0.45;
+            spawnParticles(player.x, player.y, '#ef4444', 6);
+            if (player.hp <= 0) {
+              gameState = 'GAMEOVER';
+              finalStats.textContent = `存活时间: ${formatTime(elapsedTime)} | 击杀史莱姆: ${kills}`;
+              gameoverScreen.classList.remove('hidden');
+            }
+          }
+        }
+      }
+
+      for (let i = gems.length - 1; i >= 0; i--) {
+        const g = gems[i];
+        const dist = Math.hypot(player.x - g.x, player.y - g.y);
+        if (dist < player.pickupRadius) {
+          const angle = Math.atan2(player.y - g.y, player.x - g.x);
+          g.x += Math.cos(angle) * 350 * dt;
+          g.y += Math.sin(angle) * 350 * dt;
+        }
+        if (dist < player.radius + 8) {
+          player.xp += g.value;
+          gems.splice(i, 1);
+          playSound('gem');
+
+          if (player.xp >= player.nextXp) {
+            player.xp -= player.nextXp;
+            player.level++;
+            player.nextXp = Math.round(player.nextXp * 1.32 + 4);
+            updateHUD();
+            triggerLevelUp();
+            return;
+          }
+        }
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= dt;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+      for (let i = lightnings.length - 1; i >= 0; i--) {
+        lightnings[i].life -= dt;
+        if (lightnings[i].life <= 0) lightnings.splice(i, 1);
+      }
+      for (let i = frostWaves.length - 1; i >= 0; i--) {
+        const fw = frostWaves[i];
+        fw.life -= dt;
+        fw.radius += (fw.maxRadius / 0.35) * dt;
+        if (fw.life <= 0) frostWaves.splice(i, 1);
+      }
+
+      updateHUD();
+    }
+
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60).toString().padStart(2, '0');
+      const s = Math.floor(sec % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function updateHUD() {
+      const pct = Math.min(100, (player.xp / player.nextXp) * 100);
+      xpFill.style.width = `${pct}%`;
+      levelText.textContent = `Lv.${player.level}`;
+      timeText.textContent = formatTime(elapsedTime);
+      killText.textContent = `击杀: ${kills}`;
+
+      let tagsHtml = `<span class="skill-tag">🔮 Lv.${player.skills.missile}</span>`;
+      if (player.skills.fireOrb > 0) tagsHtml += `<span class="skill-tag">🔥 Lv.${player.skills.fireOrb}</span>`;
+      if (player.skills.thunder > 0) tagsHtml += `<span class="skill-tag">⚡ Lv.${player.skills.thunder}</span>`;
+      if (player.skills.frost > 0) tagsHtml += `<span class="skill-tag">❄️ Lv.${player.skills.frost}</span>`;
+      skillsBar.innerHTML = tagsHtml;
+    }
+
+    function render() {
+      ctx.fillStyle = '#12151f';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+      ctx.lineWidth = 1;
+      const gridSize = 48;
+      for (let x = 0; x < canvas.width; x += gridSize) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += gridSize) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+
+      for (const fw of frostWaves) {
+        ctx.save();
+        ctx.strokeStyle = `rgba(56, 189, 248, ${fw.life / 0.35})`;
+        ctx.fillStyle = `rgba(56, 189, 248, ${(fw.life / 0.35) * 0.15})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(fw.x, fw.y, fw.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      for (const g of gems) {
+        ctx.fillStyle = '#34d399';
+        ctx.beginPath();
+        ctx.moveTo(g.x, g.y - 6);
+        ctx.lineTo(g.x + 5, g.y);
+        ctx.lineTo(g.x, g.y + 6);
+        ctx.lineTo(g.x - 5, g.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      for (const e of enemies) {
+        let fill = e.color;
+        if (e.hitFlash > 0) fill = '#ffffff';
+        else if (e.slowTimer > 0) fill = '#38bdf8';
+
+        ctx.fillStyle = fill;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.radius, Math.PI, 0);
+        ctx.quadraticCurveTo(e.x + e.radius, e.y + e.radius * 0.9, e.x, e.y + e.radius * 0.9);
+        ctx.quadraticCurveTo(e.x - e.radius, e.y + e.radius * 0.9, e.x - e.radius, e.y);
+        ctx.fill();
+
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(e.x - e.radius * 0.32, e.y - 1, 2.5, 0, Math.PI * 2);
+        ctx.arc(e.x + e.radius * 0.32, e.y - 1, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      for (const b of bullets) {
+        ctx.fillStyle = '#38bdf8';
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      if (player.skills.fireOrb > 0) {
+        for (let i = 0; i < player.fireOrbCount; i++) {
+          const angle = player.fireOrbAngle + (Math.PI * 2 / player.fireOrbCount) * i;
+          const orbX = player.x + Math.cos(angle) * player.fireOrbRadius;
+          const orbY = player.y + Math.sin(angle) * player.fireOrbRadius;
+
+          ctx.fillStyle = '#f97316';
+          ctx.shadowColor = '#ea580c';
+          ctx.shadowBlur = 14;
+          ctx.beginPath();
+          ctx.arc(orbX, orbY, 10, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#fef08a';
+          ctx.beginPath();
+          ctx.arc(orbX, orbY, 5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+      }
+
+      for (const l of lightnings) {
+        ctx.save();
+        ctx.strokeStyle = `rgba(250, 204, 21, ${l.life / l.maxLife})`;
+        ctx.lineWidth = 4;
+        ctx.shadowColor = '#facc15';
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.moveTo(l.x + (Math.random() - 0.5) * 30, 0);
+        ctx.lineTo(l.x - 12, l.y * 0.45);
+        ctx.lineTo(l.x + 14, l.y * 0.72);
+        ctx.lineTo(l.x, l.y);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      for (const p of particles) {
+        ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+      }
+      ctx.globalAlpha = 1;
+
+      ctx.save();
+      if (player.invulnTimer > 0 && Math.floor(player.invulnTimer * 20) % 2 === 0) {
+        ctx.globalAlpha = 0.45;
+      }
+      ctx.fillStyle = '#6366f1';
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#a855f7';
+      ctx.beginPath();
+      ctx.moveTo(player.x - 16, player.y - 8);
+      ctx.lineTo(player.x + 16, player.y - 8);
+      ctx.lineTo(player.x, player.y - 28);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      const hpWidth = 36;
+      const hpPct = Math.max(0, player.hp / player.maxHp);
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(player.x - hpWidth / 2, player.y + player.radius + 8, hpWidth, 5);
+      ctx.fillStyle = hpPct > 0.35 ? '#22c55e' : '#ef4444';
+      ctx.fillRect(player.x - hpWidth / 2, player.y + player.radius + 8, hpWidth * hpPct, 5);
+
+      if (joystick.active) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(joystick.startX, joystick.startY, 45, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.45)';
+        ctx.beginPath();
+        ctx.arc(joystick.currX, joystick.currY, 18, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function gameLoop(timestamp) {
+      if (gameState !== 'PLAYING') return;
+      const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+      lastTime = timestamp;
+      update(dt);
+      render();
+      if (gameState === 'PLAYING') requestAnimationFrame(gameLoop);
+    }
+  </script>
+</body>
+</html>
