@@ -245,6 +245,28 @@
   <canvas id="gameCanvas"></canvas>
 
   <script>
+    // 强制把核心启动函数声明在最前面，确保全局可见
+    window.startGame = function() {
+      try {
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+      } catch (e) {
+        console.log("音频初始化提示：", e);
+      }
+
+      initGame();
+      document.getElementById('start-screen').classList.add('hidden');
+      document.getElementById('gameover-screen').classList.add('hidden');
+      document.getElementById('levelup-screen').classList.add('hidden');
+      gameState = 'PLAYING';
+      lastTime = performance.now();
+      requestAnimationFrame(gameLoop);
+    };
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
