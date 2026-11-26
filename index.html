@@ -511,17 +511,25 @@
 
     // 确保开始按钮百分之百能点开的保险函数
     function startGame() {
+      // 首次点击时安全唤醒音频上下文，防止浏览器拦截卡死
       try {
-        initGame();
-        document.getElementById('start-screen').classList.add('hidden');
-        document.getElementById('gameover-screen').classList.add('hidden');
-        document.getElementById('levelup-screen').classList.add('hidden');
-        gameState = 'PLAYING';
-        lastTime = performance.now();
-        requestAnimationFrame(gameLoop);
-      } catch (err) {
-        console.error("游戏启动出错：", err);
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+      } catch (e) {
+        console.log("音频初始化提示：", e);
       }
+
+      initGame();
+      startScreen.classList.add('hidden');
+      gameoverScreen.classList.add('hidden');
+      levelupScreen.classList.add('hidden');
+      gameState = 'PLAYING';
+      lastTime = performance.now();
+      requestAnimationFrame(gameLoop);
     }
     
     function initGame() {
