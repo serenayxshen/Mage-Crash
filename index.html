@@ -415,6 +415,43 @@
       joystick.dy = 0;
     });
 
+    <script>
+    // 1. 【第一名】把 Pet 类放在最顶上！
+    class Pet {
+        constructor(type, name) {
+            this.type = type;
+            this.name = name;
+            this.maxHp = 50;
+            this.hp = 50;
+            this.attack = 10;
+            this.attackRange = 40;
+            this.speed = 3.5;
+            this.isDead = false;
+            this.respawnTimer = 0;
+            this.x = 0;
+            this.y = 0;
+        }
+
+        update(player, enemies) { /* ... 略 ... */ }
+        findNearestEnemy(enemies) { /* ... */ }
+        attackTarget(target) { target.hp -= this.attack; }
+        takeDamage(amount) { if (this.isDead) return; this.hp -= amount; if (this.hp <= 0) this.die(); }
+        die() { this.isDead = true; this.respawnTimer = 60; this.maxHp = 50; this.hp = 0; this.attack = 10; }
+        revive(player) { this.isDead = false; this.hp = this.maxHp; this.x = player.x + 20; this.y = player.y + 20; }
+        recall(player) { if (this.isDead) return; this.x = player.x + 30; this.y = player.y + 30; }
+    }
+
+    // 全局变量定义
+    let activePet = null;
+
+    // 2. 【后面】放你原本的各种游戏逻辑、主循环、以及刚才改好的 getAvailableUpgrades()
+    function getAvailableUpgrades() {
+        // ... 你的卡牌池（里面包含小灰狼卡牌） ...
+    }
+
+    // ... 其他游戏主循环、按键监听等代码 ...
+</script>
+    
     // 动态生成升级卡牌池
     function getAvailableUpgrades() {
       const pool = [
