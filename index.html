@@ -509,6 +509,21 @@
       return pool;
     }
 
+    // 确保开始按钮百分之百能点开的保险函数
+    function startGame() {
+      try {
+        initGame();
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('gameover-screen').classList.add('hidden');
+        document.getElementById('levelup-screen').classList.add('hidden');
+        gameState = 'PLAYING';
+        lastTime = performance.now();
+        requestAnimationFrame(gameLoop);
+      } catch (err) {
+        console.error("游戏启动出错：", err);
+      }
+    }
+    
     function initGame() {
       player = {
         x: canvas.width / 2,
