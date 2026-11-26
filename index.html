@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>魔法师 vs 史莱姆军团</title>
+  <title>魔法师 vs 史莱姆军团 - 技能觉醒版</title>
   <style>
     * {
       box-sizing: border-box;
@@ -45,7 +45,6 @@
       border-radius: 999px;
       overflow: hidden;
       border: 1px solid rgba(255, 255, 255, 0.2);
-      position: relative;
     }
     #xp-fill {
       height: 100%;
@@ -62,11 +61,24 @@
       text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
     }
     .badge {
-      background: rgba(20, 25, 38, 0.75);
+      background: rgba(20, 25, 38, 0.78);
       padding: 6px 12px;
       border-radius: 10px;
       border: 1px solid rgba(255, 255, 255, 0.12);
       backdrop-filter: blur(4px);
+    }
+    #skills-bar {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .skill-tag {
+      background: rgba(99, 102, 241, 0.25);
+      border: 1px solid rgba(129, 140, 248, 0.45);
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #e0e7ff;
     }
     #sound-btn {
       pointer-events: auto;
@@ -86,7 +98,7 @@
     .overlay {
       position: fixed;
       inset: 0;
-      background: rgba(10, 13, 22, 0.82);
+      background: rgba(10, 13, 22, 0.84);
       backdrop-filter: blur(6px);
       display: flex;
       flex-direction: column;
@@ -100,7 +112,7 @@
       display: none !important;
     }
     h1 {
-      font-size: clamp(28px, 5vw, 44px);
+      font-size: clamp(26px, 5vw, 42px);
       margin-bottom: 10px;
       background: linear-gradient(135deg, #60a5fa, #c084fc);
       -webkit-background-clip: text;
@@ -108,8 +120,8 @@
     }
     p.subtitle {
       color: #94a3b8;
-      margin-bottom: 26px;
-      max-width: 440px;
+      margin-bottom: 24px;
+      max-width: 460px;
       line-height: 1.6;
       font-size: 15px;
     }
@@ -136,26 +148,43 @@
       gap: 16px;
       flex-wrap: wrap;
       justify-content: center;
-      max-width: 760px;
-      margin-top: 16px;
+      max-width: 780px;
+      margin-top: 14px;
     }
     .upgrade-card {
       background: linear-gradient(180deg, #1e2538 0%, #151a28 100%);
       border: 2px solid rgba(129, 140, 248, 0.35);
       border-radius: 16px;
-      padding: 20px 16px;
-      width: 210px;
+      padding: 18px 14px;
+      width: 215px;
       cursor: pointer;
       transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
+      position: relative;
+    }
+    .upgrade-card.new-skill {
+      border-color: rgba(250, 204, 21, 0.6);
+      background: linear-gradient(180deg, #27233a 0%, #171826 100%);
     }
     .upgrade-card:hover {
       transform: translateY(-6px);
       border-color: #38bdf8;
       box-shadow: 0 10px 25px rgba(56, 189, 248, 0.3);
+    }
+    .card-badge {
+      font-size: 11px;
+      font-weight: bold;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.2);
+      color: #7dd3fc;
+    }
+    .new-skill .card-badge {
+      background: rgba(250, 204, 21, 0.25);
+      color: #fde047;
     }
     .card-icon {
       font-size: 36px;
@@ -180,10 +209,11 @@
       <div id="xp-fill"></div>
     </div>
     <div class="stats-row">
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
         <span class="badge" id="level-text">Lv.1</span>
         <span class="badge" id="time-text">00:00</span>
         <span class="badge" id="kill-text">击杀: 0</span>
+        <div id="skills-bar"></div>
       </div>
       <button id="sound-btn">🔊 音效: 开</button>
     </div>
@@ -193,8 +223,8 @@
   <div id="start-screen" class="overlay">
     <h1>🧙‍♂️ 魔法师 vs 史莱姆军团</h1>
     <p class="subtitle">
-      使用 <b>WASD / 方向键</b>（或按住屏幕拖动虚拟摇杆）移动。<br>
-      魔法师会自动发射奥术飞弹，收集绿色宝石升级强化！
+      <b>WASD / 方向键</b>（或拖动屏幕虚拟摇杆）移动。<br>
+      升级可解锁<b>🔥火焰法典</b>、<b>⚡雷暴法阵</b>、<b>❄️冰霜新星</b>等四大流派魔法！
     </p>
     <button class="primary-btn" id="start-btn">开始战斗</button>
   </div>
@@ -218,11 +248,11 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
-    // UI 元素
     const xpFill = document.getElementById('xp-fill');
     const levelText = document.getElementById('level-text');
     const timeText = document.getElementById('time-text');
     const killText = document.getElementById('kill-text');
+    const skillsBar = document.getElementById('skills-bar');
     const soundBtn = document.getElementById('sound-btn');
 
     const startScreen = document.getElementById('start-screen');
@@ -231,7 +261,6 @@
     const cardsBox = document.getElementById('cards-box');
     const finalStats = document.getElementById('final-stats');
 
-    // 自适应窗口大小
     function resize() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -239,7 +268,7 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // 简易合成音效系统 (Web Audio API)
+    // 合成音效系统
     let soundEnabled = true;
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
@@ -259,15 +288,31 @@
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(520, now);
         osc.frequency.exponentialRampToValueAtTime(180, now + 0.08);
-        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.setValueAtTime(0.07, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
         osc.start(now);
         osc.stop(now + 0.08);
+      } else if (type === 'thunder') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(240, now);
+        osc.frequency.exponentialRampToValueAtTime(45, now + 0.18);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        osc.start(now);
+        osc.stop(now + 0.18);
+      } else if (type === 'frost') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(920, now);
+        osc.frequency.exponentialRampToValueAtTime(320, now + 0.25);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        osc.start(now);
+        osc.stop(now + 0.25);
       } else if (type === 'hit') {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(160, now);
         osc.frequency.exponentialRampToValueAtTime(60, now + 0.06);
-        gain.gain.setValueAtTime(0.09, now);
+        gain.gain.setValueAtTime(0.08, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
         osc.start(now);
         osc.stop(now + 0.06);
@@ -275,7 +320,7 @@
         osc.type = 'sine';
         osc.frequency.setValueAtTime(750, now);
         osc.frequency.exponentialRampToValueAtTime(1100, now + 0.07);
-        gain.gain.setValueAtTime(0.07, now);
+        gain.gain.setValueAtTime(0.06, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
         osc.start(now);
         osc.stop(now + 0.07);
@@ -298,26 +343,26 @@
     });
 
     // 游戏状态
-    let gameState = 'START'; // START, PLAYING, LEVELUP, GAMEOVER
+    let gameState = 'START';
     let lastTime = 0;
     let elapsedTime = 0;
     let kills = 0;
     let spawnTimer = 0;
 
-    // 玩家数据
     let player = {};
     let bullets = [];
     let enemies = [];
     let gems = [];
     let particles = [];
+    let lightnings = []; // 闪电特效数组
+    let frostWaves = []; // 冰霜新星扩散环
 
-    // 键盘与虚拟摇杆输入
+    // 输入控制
     const keys = {};
     window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
     window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
     let joystick = { active: false, startX: 0, startY: 0, currX: 0, currY: 0, dx: 0, dy: 0 };
-
     canvas.addEventListener('pointerdown', e => {
       if (gameState !== 'PLAYING') return;
       joystick.active = true;
@@ -348,453 +393,150 @@
       joystick.dy = 0;
     });
 
-    // 升级选项池
-    const upgradePool = [
-      {
-        icon: '🔮',
-        title: '多重飞弹',
-        desc: '每次额外发射 +1 颗奥术飞弹',
-        apply: () => { player.projectileCount += 1; }
-      },
-      {
-        icon: '⚡',
-        title: '急速施法',
-        desc: '攻击冷却时间减少 18%',
-        apply: () => { player.fireCooldown *= 0.82; }
-      },
-      {
-        icon: '🔥',
-        title: '奥术增幅',
-        desc: '飞弹伤害提升 +35%',
-        apply: () => { player.damage = Math.round(player.damage * 1.35); }
-      },
-      {
-        icon: '👟',
-        title: '疾风步',
-        desc: '移动速度提升 +15%',
-        apply: () => { player.speed *= 1.15; }
-      },
-      {
-        icon: '🧲',
-        title: '魔力磁铁',
-        desc: '经验宝石拾取范围扩大 45%',
-        apply: () => { player.pickupRadius *= 1.45; }
-      },
-      {
-        icon: '❤️',
-        title: '生命涌泉',
-        desc: '最大生命 +25 并恢复 50% 生命',
-        apply: () => {
-          player.maxHp += 25;
-          player.hp = Math.min(player.maxHp, player.hp + player.maxHp * 0.5);
+    // 动态生成升级卡牌池（支持新技能解锁 + 技能升级 + 基础属性）
+    function getAvailableUpgrades() {
+      const pool = [
+        // 1. 奥术飞弹强化
+        {
+          isSkill: true,
+          badge: `奥术飞弹 Lv.${player.skills.missile + 1}`,
+          icon: '🔮',
+          title: '多重奥术飞弹',
+          desc: '每次发射的飞弹数量 +1，伤害 +15%',
+          apply: () => {
+            player.skills.missile++;
+            player.projectileCount += 1;
+            player.damage = Math.round(player.damage * 1.15);
+          }
+        },
+        // 2. 火焰法典（环绕火球）
+        {
+          isSkill: true,
+          badge: player.skills.fireOrb === 0 ? '✨ 解锁新魔法' : `火焰法典 Lv.${player.skills.fireOrb + 1}`,
+          icon: '🔥',
+          title: player.skills.fireOrb === 0 ? '火焰法典' : '火焰法典·强化',
+          desc: player.skills.fireOrb === 0
+            ? '召唤 2 颗火球环绕身体旋转，灼烧并击退靠近的敌人'
+            : '环绕火球数量 +1，旋转速度与灼烧伤害提升',
+          apply: () => {
+            if (player.skills.fireOrb === 0) {
+              player.skills.fireOrb = 1;
+              player.fireOrbCount = 2;
+            } else {
+              player.skills.fireOrb++;
+              player.fireOrbCount += 1;
+              player.fireOrbSpeed += 0.45;
+              player.fireOrbDamage = Math.round(player.fireOrbDamage * 1.25);
+            }
+          }
+        },
+        // 3. 雷暴法阵（随机天雷）
+        {
+          isSkill: true,
+          badge: player.skills.thunder === 0 ? '✨ 解锁新魔法' : `雷暴法阵 Lv.${player.skills.thunder + 1}`,
+          icon: '⚡',
+          title: player.skills.thunder === 0 ? '雷暴法阵' : '雷暴法阵·强化',
+          desc: player.skills.thunder === 0
+            ? '每 2.4 秒召唤天雷轰击随机敌人，造成范围高额伤害'
+            : '天雷劈落数量 +1，冷却缩短，雷电伤害提升',
+          apply: () => {
+            if (player.skills.thunder === 0) {
+              player.skills.thunder = 1;
+            } else {
+              player.skills.thunder++;
+              player.thunderCount += 1;
+              player.thunderCooldown = Math.max(0.9, player.thunderCooldown * 0.85);
+              player.thunderDamage = Math.round(player.thunderDamage * 1.25);
+            }
+          }
+        },
+        // 4. 冰霜新星（范围冻结）
+        {
+          isSkill: true,
+          badge: player.skills.frost === 0 ? '✨ 解锁新魔法' : `冰霜新星 Lv.${player.skills.frost + 1}`,
+          icon: '❄️',
+          title: player.skills.frost === 0 ? '冰霜新星' : '冰霜新星·强化',
+          desc: player.skills.frost === 0
+            ? '每隔数秒释放寒冰冲击波，冻结周围敌人使其减速 60%'
+            : '寒冰冲击波范围扩大 25%，冷却时间缩短',
+          apply: () => {
+            if (player.skills.frost === 0) {
+              player.skills.frost = 1;
+            } else {
+              player.skills.frost++;
+              player.frostRadius = Math.round(player.frostRadius * 1.25);
+              player.frostCooldown = Math.max(1.8, player.frostCooldown * 0.85);
+              player.frostDamage = Math.round(player.frostDamage * 1.3);
+            }
+          }
+        },
+        // 5. 通用强化
+        {
+          isSkill: false,
+          badge: '通用强化',
+          icon: '⚡',
+          title: '急速施法',
+          desc: '所有魔法的冷却时间减少 15%',
+          apply: () => {
+            player.fireCooldown *= 0.85;
+            player.thunderCooldown *= 0.85;
+            player.frostCooldown *= 0.85;
+          }
+        },
+        {
+          isSkill: false,
+          badge: '通用强化',
+          icon: '👟',
+          title: '疾风步',
+          desc: '移动速度 +15%，经验拾取范围 +30%',
+          apply: () => {
+            player.speed *= 1.15;
+            player.pickupRadius *= 1.3;
+          }
+        },
+        {
+          isSkill: false,
+          badge: '生存强化',
+          icon: '❤️',
+          title: '生命涌泉',
+          desc: '最大生命 +30 并立即恢复 50% 生命值',
+          apply: () => {
+            player.maxHp += 30;
+            player.hp = Math.min(player.maxHp, player.hp + player.maxHp * 0.5);
+          }
         }
-      }
-    ];
+      ];
+      return pool;
+    }
 
     function initGame() {
       player = {
         x: canvas.width / 2,
         y: canvas.height / 2,
         radius: 16,
-        speed: 210,
+        speed: 215,
         hp: 100,
         maxHp: 100,
         level: 1,
         xp: 0,
-        nextXp: 10,
-        fireCooldown: 0.65,
+        nextXp: 8,
+        pickupRadius: 80,
+        invulnTimer: 0,
+
+        // 技能等级记录
+        skills: {
+          missile: 1,
+          fireOrb: 0,
+          thunder: 0,
+          frost: 0
+        },
+
+        // 技能1：奥术飞弹
+        fireCooldown: 0.62,
         fireTimer: 0,
         damage: 14,
         projectileCount: 1,
-        projectileSpeed: 460,
-        pickupRadius: 75,
-        invulnTimer: 0
-      };
-      bullets = [];
-      enemies = [];
-      gems = [];
-      particles = [];
-      elapsedTime = 0;
-      kills = 0;
-      spawnTimer = 0;
-      updateHUD();
-    }
+        projectileSpeed: 470,
 
-    function startGame() {
-      initGame();
-      startScreen.classList.add('hidden');
-      gameoverScreen.classList.add('hidden');
-      levelupScreen.classList.add('hidden');
-      gameState = 'PLAYING';
-      lastTime = performance.now();
-      requestAnimationFrame(gameLoop);
-    }
-
-    document.getElementById('start-btn').addEventListener('click', startGame);
-    document.getElementById('restart-btn').addEventListener('click', startGame);
-
-    function triggerLevelUp() {
-      gameState = 'LEVELUP';
-      playSound('levelup');
-      cardsBox.innerHTML = '';
-
-      // 随机抽取 3 张不重复的卡牌
-      const shuffled = [...upgradePool].sort(() => Math.random() - 0.5).slice(0, 3);
-      shuffled.forEach(item => {
-        const card = document.createElement('div');
-        card.className = 'upgrade-card';
-        card.innerHTML = `
-          <div class="card-icon">${item.icon}</div>
-          <div class="card-title">${item.title}</div>
-          <div class="card-desc">${item.desc}</div>
-        `;
-        card.onclick = () => {
-          item.apply();
-          levelupScreen.classList.add('hidden');
-          updateHUD();
-          gameState = 'PLAYING';
-          lastTime = performance.now();
-          requestAnimationFrame(gameLoop);
-        };
-        cardsBox.appendChild(card);
-      });
-
-      levelupScreen.classList.remove('hidden');
-    }
-
-    function spawnEnemy() {
-      // 在屏幕边缘外生成史莱姆
-      const margin = 40;
-      let x, y;
-      const side = Math.floor(Math.random() * 4);
-      if (side === 0) { x = Math.random() * canvas.width; y = -margin; }
-      else if (side === 1) { x = canvas.width + margin; y = Math.random() * canvas.height; }
-      else if (side === 2) { x = Math.random() * canvas.width; y = canvas.height + margin; }
-      else { x = -margin; y = Math.random() * canvas.height; }
-
-      // 随时间变强，偶尔刷出大史莱姆
-      const difficulty = 1 + elapsedTime / 45;
-      const isBig = Math.random() < Math.min(0.25, elapsedTime / 180);
-
-      enemies.push({
-        x,
-        y,
-        radius: isBig ? 22 : 13,
-        speed: isBig ? 65 : (85 + Math.random() * 25),
-        hp: Math.round((isBig ? 55 : 18) * difficulty),
-        maxHp: Math.round((isBig ? 55 : 18) * difficulty),
-        color: isBig ? '#f43f5e' : '#4ade80',
-        xpValue: isBig ? 5 : 2,
-        hitFlash: 0
-      });
-    }
-
-    function spawnParticles(x, y, color, count = 6) {
-      for (let i = 0; i < count; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 50 + Math.random() * 120;
-        particles.push({
-          x, y,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          life: 0.35 + Math.random() * 0.2,
-          maxLife: 0.55,
-          color,
-          size: 3 + Math.random() * 3
-        });
-      }
-    }
-
-    function update(dt) {
-      elapsedTime += dt;
-
-      // 1. 玩家移动
-      let moveX = joystick.dx;
-      let moveY = joystick.dy;
-      if (keys['w'] || keys['arrowup']) moveY -= 1;
-      if (keys['s'] || keys['arrowdown']) moveY += 1;
-      if (keys['a'] || keys['arrowleft']) moveX -= 1;
-      if (keys['d'] || keys['arrowright']) moveX += 1;
-
-      const len = Math.hypot(moveX, moveY);
-      if (len > 1) {
-        moveX /= len;
-        moveY /= len;
-      }
-
-      player.x += moveX * player.speed * dt;
-      player.y += moveY * player.speed * dt;
-
-      // 限制在屏幕内
-      player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
-      player.y = Math.max(player.radius + 45, Math.min(canvas.height - player.radius, player.y));
-
-      if (player.invulnTimer > 0) player.invulnTimer -= dt;
-
-      // 2. 自动瞄准并射击最近敌人
-      player.fireTimer -= dt;
-      if (player.fireTimer <= 0 && enemies.length > 0) {
-        let nearest = null;
-        let minDist = Infinity;
-        for (const e of enemies) {
-          const d = Math.hypot(e.x - player.x, e.y - player.y);
-          if (d < minDist) {
-            minDist = d;
-            nearest = e;
-          }
-        }
-        if (nearest) {
-          const baseAngle = Math.atan2(nearest.y - player.y, nearest.x - player.x);
-          const spread = 0.16; // 多发子弹的扇形夹角
-          for (let i = 0; i < player.projectileCount; i++) {
-            const offset = (i - (player.projectileCount - 1) / 2) * spread;
-            const angle = baseAngle + offset;
-            bullets.push({
-              x: player.x,
-              y: player.y,
-              vx: Math.cos(angle) * player.projectileSpeed,
-              vy: Math.sin(angle) * player.projectileSpeed,
-              radius: 6,
-              damage: player.damage,
-              life: 1.8
-            });
-          }
-          playSound('shoot');
-          player.fireTimer = player.fireCooldown;
-        }
-      }
-
-      // 3. 更新子弹
-      for (let i = bullets.length - 1; i >= 0; i--) {
-        const b = bullets[i];
-        b.x += b.vx * dt;
-        b.y += b.vy * dt;
-        b.life -= dt;
-        if (b.life <= 0) {
-          bullets.splice(i, 1);
-          continue;
-        }
-
-        // 子弹碰撞史莱姆
-        for (let j = enemies.length - 1; j >= 0; j--) {
-          const e = enemies[j];
-          if (Math.hypot(b.x - e.x, b.y - e.y) < b.radius + e.radius) {
-            e.hp -= b.damage;
-            e.hitFlash = 0.08;
-            spawnParticles(b.x, b.y, '#60a5fa', 3);
-            bullets.splice(i, 1);
-
-            if (e.hp <= 0) {
-              playSound('hit');
-              spawnParticles(e.x, e.y, e.color, 8);
-              gems.push({ x: e.x, y: e.y, value: e.xpValue });
-              enemies.splice(j, 1);
-              kills++;
-            }
-            break;
-          }
-        }
-      }
-
-      // 4. 生成与更新史莱姆
-      spawnTimer -= dt;
-      const spawnInterval = Math.max(0.18, 0.95 - elapsedTime * 0.008);
-      if (spawnTimer <= 0) {
-        spawnEnemy();
-        spawnTimer = spawnInterval;
-      }
-
-      for (const e of enemies) {
-        if (e.hitFlash > 0) e.hitFlash -= dt;
-        const angle = Math.atan2(player.y - e.y, player.x - e.x);
-        e.x += Math.cos(angle) * e.speed * dt;
-        e.y += Math.sin(angle) * e.speed * dt;
-
-        // 史莱姆接触玩家
-        const dist = Math.hypot(player.x - e.x, player.y - e.y);
-        if (dist < player.radius + e.radius) {
-          if (player.invulnTimer <= 0) {
-            player.hp -= 12;
-            player.invulnTimer = 0.45;
-            spawnParticles(player.x, player.y, '#ef4444', 6);
-            if (player.hp <= 0) {
-              gameState = 'GAMEOVER';
-              finalStats.textContent = `存活时间: ${formatTime(elapsedTime)} | 击杀史莱姆: ${kills}`;
-              gameoverScreen.classList.remove('hidden');
-            }
-          }
-        }
-      }
-
-      // 5. 更新经验宝石（磁吸与拾取）
-      for (let i = gems.length - 1; i >= 0; i--) {
-        const g = gems[i];
-        const dist = Math.hypot(player.x - g.x, player.y - g.y);
-        if (dist < player.pickupRadius) {
-          const angle = Math.atan2(player.y - g.y, player.x - g.x);
-          g.x += Math.cos(angle) * 340 * dt;
-          g.y += Math.sin(angle) * 340 * dt;
-        }
-        if (dist < player.radius + 8) {
-          player.xp += g.value;
-          gems.splice(i, 1);
-          playSound('gem');
-
-          if (player.xp >= player.nextXp) {
-            player.xp -= player.nextXp;
-            player.level++;
-            player.nextXp = Math.round(player.nextXp * 1.35 + 4);
-            updateHUD();
-            triggerLevelUp();
-            return;
-          }
-        }
-      }
-
-      // 6. 更新粒子特效
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.life -= dt;
-        if (p.life <= 0) particles.splice(i, 1);
-      }
-
-      updateHUD();
-    }
-
-    function formatTime(sec) {
-      const m = Math.floor(sec / 60).toString().padStart(2, '0');
-      const s = Math.floor(sec % 60).toString().padStart(2, '0');
-      return `${m}:${s}`;
-    }
-
-    function updateHUD() {
-      const pct = Math.min(100, (player.xp / player.nextXp) * 100);
-      xpFill.style.width = `${pct}%`;
-      levelText.textContent = `Lv.${player.level}`;
-      timeText.textContent = formatTime(elapsedTime);
-      killText.textContent = `击杀: ${kills}`;
-    }
-
-    function render() {
-      // 背景与魔法阵网格
-      ctx.fillStyle = '#12151f';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
-      ctx.lineWidth = 1;
-      const gridSize = 48;
-      for (let x = 0; x < canvas.width; x += gridSize) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-      }
-      for (let y = 0; y < canvas.height; y += gridSize) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-      }
-
-      // 绘制经验宝石
-      for (const g of gems) {
-        ctx.fillStyle = '#34d399';
-        ctx.beginPath();
-        ctx.moveTo(g.x, g.y - 6);
-        ctx.lineTo(g.x + 5, g.y);
-        ctx.lineTo(g.x, g.y + 6);
-        ctx.lineTo(g.x - 5, g.y);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      // 绘制史莱姆
-      for (const e of enemies) {
-        ctx.fillStyle = e.hitFlash > 0 ? '#ffffff' : e.color;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, e.radius, Math.PI, 0);
-        ctx.quadraticCurveTo(e.x + e.radius, e.y + e.radius * 0.9, e.x, e.y + e.radius * 0.9);
-        ctx.quadraticCurveTo(e.x - e.radius, e.y + e.radius * 0.9, e.x - e.radius, e.y);
-        ctx.fill();
-
-        // 史莱姆眼睛
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.arc(e.x - e.radius * 0.32, e.y - 1, 2.5, 0, Math.PI * 2);
-        ctx.arc(e.x + e.radius * 0.32, e.y - 1, 2.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // 绘制奥术飞弹
-      for (const b of bullets) {
-        ctx.fillStyle = '#38bdf8';
-        ctx.shadowColor = '#38bdf8';
-        ctx.shadowBlur = 10;
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      }
-
-      // 绘制粒子
-      for (const p of particles) {
-        ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
-        ctx.fillStyle = p.color;
-        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
-      }
-      ctx.globalAlpha = 1;
-
-      // 绘制魔法师
-      ctx.save();
-      if (player.invulnTimer > 0 && Math.floor(player.invulnTimer * 20) % 2 === 0) {
-        ctx.globalAlpha = 0.45;
-      }
-      // 身体
-      ctx.fillStyle = '#6366f1';
-      ctx.beginPath();
-      ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-      ctx.fill();
-      // 巫师帽
-      ctx.fillStyle = '#a855f7';
-      ctx.beginPath();
-      ctx.moveTo(player.x - 16, player.y - 8);
-      ctx.lineTo(player.x + 16, player.y - 8);
-      ctx.lineTo(player.x, player.y - 28);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-
-      // 玩家脚下血条
-      const hpWidth = 36;
-      const hpPct = Math.max(0, player.hp / player.maxHp);
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(player.x - hpWidth / 2, player.y + player.radius + 8, hpWidth, 5);
-      ctx.fillStyle = hpPct > 0.35 ? '#22c55e' : '#ef4444';
-      ctx.fillRect(player.x - hpWidth / 2, player.y + player.radius + 8, hpWidth * hpPct, 5);
-
-      // 虚拟摇杆指示器
-      if (joystick.active) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(joystick.startX, joystick.startY, 45, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.fillStyle = 'rgba(56, 189, 248, 0.45)';
-        ctx.beginPath();
-        ctx.arc(joystick.currX, joystick.currY, 18, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    function gameLoop(timestamp) {
-      if (gameState !== 'PLAYING') return;
-      const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
-      lastTime = timestamp;
-
-      update(dt);
-      render();
-
-      if (gameState === 'PLAYING') {
-        requestAnimationFrame(gameLoop);
-      }
-    }
-  </script>
-</body>
-</html>
+        // 技能2：火焰法典（环绕火球）
+        fireOrbCount:
