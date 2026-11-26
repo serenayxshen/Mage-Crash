@@ -1085,12 +1085,11 @@
 </html>
 
 // ==========================================
-// 🐾 宠物系统核心逻辑 (Roguelike Pet System)
+// 1. 宠物核心类
 // ==========================================
-
 class Pet {
     constructor(type, name) {
-        this.type = type;           // 宠物类型: 'fire', 'wolf', 'tank', 'mech'
+        this.type = type;           // 宠物类型: 'wolf', 'mech', 'tank', 'fire'
         this.name = name;           // 宠物名称
         
         // 基础属性
@@ -1098,61 +1097,55 @@ class Pet {
         this.hp = 50;
         this.attack = 10;
         this.attackRange = 40;      // 近战攻击距离
-        this.speed = 3.5;           // 移动速度（可以比玩家稍快或相当）
+        this.speed = 3.5;           // 移动速度
         
         // 状态控制
         this.isDead = false;
-        this.respawnTimer = 0;      // 复活倒计时（帧数或秒数，基于你的主循环）
-        this.maxRespawnTime = 60;   // 60秒复活时间（假设按每秒60帧，或者用秒计时）
+        this.respawnTimer = 0;      // 复活倒计时（秒）
         
-        // 初始坐标（跟随玩家）
+        // 初始坐标
         this.x = 0;
         this.y = 0;
     }
 
-    // 核心更新循环
+    // 核心更新循环（在主循环中调用）
     update(player, enemies) {
-        // 如果宠物已经阵亡，处理复活倒计时
         if (this.isDead) {
             if (this.respawnTimer > 0) {
-                this.respawnTimer -= 1/60; // 假设每帧调用一次，减去时间
+                this.respawnTimer -= 1 / 60; // 假设每秒60帧
             } else {
                 this.revive(player);
             }
             return;
         }
 
-        // 1. 寻找最近的敌人
+        // 寻找最近的敌人
         let target = this.findNearestEnemy(enemies);
 
         if (target) {
-            // 有敌人时：朝敌人移动并攻击
             let dx = target.x - this.x;
             let dy = target.y - this.y;
             let dist = Math.hypot(dx, dy);
 
             if (dist > this.attackRange) {
-                // 接近敌人
                 this.x += (dx / dist) * this.speed;
                 this.y += (dy / dist) * this.speed;
             } else {
-                // 进入攻击范围，造成伤害（这里可以加攻击冷却）
                 this.attackTarget(target);
             }
         } else {
-            // 没有敌人时：紧跟玩家身边
+            // 没有敌人时跟随玩家
             let dx = player.x - this.x;
             let dy = player.y - this.y;
             let dist = Math.hypot(dx, dy);
 
-            if (dist > 80) { // 离玩家太远时自动追赶
+            if (dist > 80) {
                 this.x += (dx / dist) * this.speed;
                 this.y += (dy / dist) * this.speed;
             }
         }
     }
 
-    // 寻找最近的敌方目标
     findNearestEnemy(enemies) {
         let nearest = null;
         let minDist = Infinity;
@@ -1166,14 +1159,10 @@ class Pet {
         return nearest;
     }
 
-    // 攻击目标
     attackTarget(target) {
-        // 扣减敌人血量逻辑
         target.hp -= this.attack;
-        // 可以在这里加一个伤害数字飘字或轻微击退
     }
 
-    // 受伤与死亡判定
     takeDamage(amount) {
         if (this.isDead) return;
         this.hp -= amount;
@@ -1182,18 +1171,16 @@ class Pet {
         }
     }
 
-    // 宠物阵亡：清空所有培养信息并进入 60 秒复活冷却
+    // 阵亡：清空所有培养信息并进入 60 秒复活冷却
     die() {
         this.isDead = true;
-        this.respawnTimer = 60; // 60秒
-        // 重置所有培养属性（清空攻击和血量加成）
+        this.respawnTimer = 60; 
         this.maxHp = 50;
         this.hp = 0;
         this.attack = 10;
-        console.log(`${this.name} 阵亡了！所有培养属性已清零，将在 60 秒后复活。`);
+        console.log(`${this.name} 阵亡！培养属性已清零，60秒后复活。`);
     }
 
-    // 复活
     revive(player) {
         this.isDead = false;
         this.hp = this.maxHp;
@@ -1204,9 +1191,94 @@ class Pet {
 
     // 空格键一键召回护主
     recall(player) {
-        if (this.isDead) return; // 死了可叫不回来
+        if (this.isDead) return;
         this.x = player.x + 30;
         this.y = player.y + 30;
-        // 可以加个瞬间的闪烁/传送特效
     }
+}
+
+// 全局当前激活的宠物实例
+let activePet = null;
+
+              // ==========================================
+// 2. 卡牌/技能池配置
+// ==========================================
+const skillCardsPool = [
+    {
+        id: 'pet_wolf',
+        name: '召唤：暗夜小灰狼',
+        type: 'pet',
+        desc: '获得一只极速撕咬的近战小灰狼。阵亡后需 60 秒复活且属性清零。',
+        onSelect: (player) => {
+            activePet = new Pet('wolf', '暗夜小灰狼');
+            activePet.x = player.x + 20;
+            activePet.y = player.y + 20;
+        }
+    },
+    {
+        id: 'pet_mech',
+        name: '召唤：铁拳机械卫士',
+        type: 'pet',
+        desc: '获得一台重拳开路、能击退敌人的机械卫士。',
+        onSelect: (player) => {
+            activePet = new Pet('mech', '铁拳机械卫士');
+            activePet.x = player.x + 20;
+            activePet.y = player.y + 20;
+        }
+    },
+    {
+        id: 'pet_tank',
+        name: '召唤：荆棘重甲兽',
+        type: 'pet',
+        desc: '获得一只超高血量、能为主分担伤害的重甲兽。',
+        onSelect: (player) => {
+            activePet = new Pet('tank', '荆棘重甲兽');
+            activePet.x = player.x + 20;
+            activePet.y = player.y + 20;
+        }
+    }
+];
+
+              // ==========================================
+// 3. 键盘交互（空格召回）
+// ==========================================
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && activePet) {
+        activePet.recall(player); // player 是你的主角对象
+        e.preventDefault();       // 防止网页滚动
+    }
+});
+
+              // ==========================================
+// 4. 在主循环中更新与渲染
+// ==========================================
+function gameLoop() {
+    // --- 步骤 A：更新逻辑 ---
+    if (activePet) {
+        activePet.update(player, enemies);
+    }
+
+    // --- 步骤 B：画面渲染 (Canvas 示例) ---
+    // ctx.clearRect(...) 之后绘制宠物
+    if (activePet) {
+        if (activePet.isDead) {
+            // 阵亡状态：在屏幕某个角落或玩家头顶显示复活倒计时
+            ctx.fillStyle = "red";
+            ctx.font = "12px sans-serif";
+            ctx.fillText(`宠物复活中: ${Math.ceil(activePet.respawnTimer)}s`, player.x - 30, player.y - 30);
+        } else {
+            // 存活状态：绘制宠物小圆圈及名字
+            ctx.fillStyle = "darkgray";
+            ctx.beginPath();
+            ctx.arc(activePet.x, activePet.y, 10, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 宠物名字与血量
+            ctx.fillStyle = "white";
+            ctx.font = "10px sans-serif";
+            ctx.fillText(`${activePet.name} (${activePet.hp}/${activePet.maxHp})`, activePet.x - 25, activePet.y - 15);
+        }
+    }
+
+    requestAnimationFrame(gameLoop);
 }
