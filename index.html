@@ -877,7 +877,7 @@
           if (player.xp >= player.nextXp) {
             player.xp -= player.nextXp;
             player.level++;
-            player.nextXp = Math.round(player.nextXp * 1.32 + 4);
+            player.nextXp = Math.round(player.nextXp * 1.18 + 4);
             updateHUD();
             triggerLevelUp();
             return;
