@@ -416,35 +416,114 @@
     });
 
     <script>
-    // 1. 【第一名】把 Pet 类放在最顶上！
+    // ==========================================
+    // 🐾 1. 把 Pet 类放在整个脚本的最顶端！
+    // ==========================================
     class Pet {
         constructor(type, name) {
-            this.type = type;
-            this.name = name;
+            this.type = type;           
+            this.name = name;           
             this.maxHp = 50;
             this.hp = 50;
             this.attack = 10;
-            this.attackRange = 40;
-            this.speed = 3.5;
+            this.attackRange = 40;      
+            this.speed = 3.5;           
             this.isDead = false;
-            this.respawnTimer = 0;
+            this.respawnTimer = 0;      
             this.x = 0;
             this.y = 0;
         }
 
-        update(player, enemies) { /* ... 略 ... */ }
-        findNearestEnemy(enemies) { /* ... */ }
-        attackTarget(target) { target.hp -= this.attack; }
-        takeDamage(amount) { if (this.isDead) return; this.hp -= amount; if (this.hp <= 0) this.die(); }
-        die() { this.isDead = true; this.respawnTimer = 60; this.maxHp = 50; this.hp = 0; this.attack = 10; }
-        revive(player) { this.isDead = false; this.hp = this.maxHp; this.x = player.x + 20; this.y = player.y + 20; }
-        recall(player) { if (this.isDead) return; this.x = player.x + 30; this.y = player.y + 30; }
+        update(player, enemies) {
+            if (this.isDead) {
+                if (this.respawnTimer > 0) {
+                    this.respawnTimer -= 1 / 60; 
+                } else {
+                    this.revive(player);
+                }
+                return;
+            }
+
+            let target = this.findNearestEnemy(enemies);
+            if (target) {
+                let dx = target.x - this.x;
+                let dy = target.y - this.y;
+                let dist = Math.hypot(dx, dy);
+
+                if (dist > this.attackRange) {
+                    this.x += (dx / dist) * this.speed;
+                    this.y += (dy / dist) * this.speed;
+                } else {
+                    this.attackTarget(target);
+                }
+            } else {
+                let dx = player.x - this.x;
+                let dy = player.y - this.y;
+                let dist = Math.hypot(dx, dy);
+
+                if (dist > 80) {
+                    this.x += (dx / dist) * this.speed;
+                    this.y += (dy / dist) * this.speed;
+                }
+            }
+        }
+
+        findNearestEnemy(enemies) {
+            let nearest = null;
+            let minDist = Infinity;
+            for (let enemy of enemies) {
+                let dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = enemy;
+                }
+            }
+            return nearest;
+        }
+
+        attackTarget(target) {
+            target.hp -= this.attack;
+        }
+
+        takeDamage(amount) {
+            if (this.isDead) return;
+            this.hp -= amount;
+            if (this.hp <= 0) {
+                this.die();
+            }
+        }
+
+        die() {
+            this.isDead = true;
+            this.respawnTimer = 60; 
+            this.maxHp = 50;
+            this.hp = 0;
+            this.attack = 10;
+        }
+
+        revive(player) {
+            this.isDead = false;
+            this.hp = this.maxHp;
+            this.x = player.x + 20;
+            this.y = player.y + 20;
+        }
+
+        recall(player) {
+            if (this.isDead) return;
+            this.x = player.x + 30;
+            this.y = player.y + 30;
+        }
     }
 
-    // 全局变量定义
+    // 🌟 这一行必须紧跟在 class Pet 下面，用来确保全局能调用
+    window.Pet = Pet;
     let activePet = null;
 
-    // 2. 【后面】放你原本的各种游戏逻辑、主循环、以及刚才改好的 getAvailableUpgrades()
+    // ==========================================
+    // 👇 2. 下面才是你原本写的所有游戏代码（包括 getAvailableUpgrades、主循环等）
+    // ==========================================
+    
+    // 你的其他代码从这里开始...
     function getAvailableUpgrades() {
         // ... 你的卡牌池（里面包含小灰狼卡牌） ...
     }
