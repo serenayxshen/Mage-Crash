@@ -780,6 +780,9 @@
       enemies.push({
         x,
         y,
+        isBig: isBig,
+        damageToPlayer: isBig ? 24 : 12,
+        damageToPet: isBig ? 16 : 8,
         radius: isBig ? 22 : 13,
         speed: isBig ? 65 : (85 + Math.random() * 25),
         hp: Math.round((isBig ? 55 : 18) * difficulty),
