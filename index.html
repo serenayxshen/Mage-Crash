@@ -313,6 +313,9 @@
 
       attackTarget(target) {
         target.hp -= this.attack;
+        target.hitFlash = 0.08; // 让被咬的敌人也产生受击闪白！
+        // 🌟 每次小灰狼咬中敌人，产生橘红色的撕咬特效粒子
+        spawnParticles(this.x, this.y, '#f97316', 3);
       }
 
       takeDamage(amount) {
