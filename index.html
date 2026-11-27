@@ -1079,7 +1079,15 @@
 
       // 绘制敌人
       for (const e of enemies) {
-        ctx.fillStyle = e.hitFlash > 0 ? '#ffffff' : e.color;
+        // 🌟 如果正在受击闪白，显示白色；如果处于冰冻减速状态，显示冰蓝色；否则显示原本颜色
+        let renderColor = e.color;
+        if (e.hitFlash > 0) {
+          renderColor = '#ffffff';
+        } else if (e.slowTimer > 0) {
+          renderColor = '#38bdf8'; // 冰霜亮蓝色！
+        }
+
+        ctx.fillStyle = renderColor;
         ctx.beginPath();
         ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
         ctx.fill();
