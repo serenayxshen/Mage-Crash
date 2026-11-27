@@ -1110,12 +1110,22 @@
       }
       ctx.stroke();
 
-      // 绘制宝石
+     // 绘制宝石（金色菱形结晶）
       for (const g of gems) {
-        ctx.fillStyle = '#38bdf8';
+        const size = 6; // 控制菱形的大小
+        ctx.fillStyle = '#facc15'; // 璀璨金黄色
         ctx.beginPath();
-        ctx.arc(g.x, g.y, 5, 0, Math.PI * 2);
+        ctx.moveTo(g.x, g.y - size * 1.3); // 上顶点（稍微拉长一点更像钻石/水晶）
+        ctx.lineTo(g.x + size, g.y);       // 右顶点
+        ctx.lineTo(g.x, g.y + size * 1.3); // 下顶点
+        ctx.lineTo(g.x - size, g.y);       // 左顶点
+        ctx.closePath();
         ctx.fill();
+
+        // 🌟 可选加分项：给菱形加一圈浅金色高光描边，更有立体感
+        ctx.strokeStyle = '#fef08a';
+        ctx.lineWidth = 1;
+        ctx.stroke();
       }
 
       // 绘制子弹
