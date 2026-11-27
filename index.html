@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>魔法师 vs 史莱姆军团 - 技能觉醒版</title>
+  <title>魔法师 vs 史莱姆军团 - 技能觉醒与宠物版</title>
   <style>
     * {
       box-sizing: border-box;
@@ -224,7 +224,8 @@
     <h1>🧙‍♂️ 魔法师 vs 史莱姆军团</h1>
     <p class="subtitle">
       <b>WASD / 方向键</b>（或拖动屏幕虚拟摇杆）移动。<br>
-      升级可解锁<b>🔥火焰法典</b>、<b>⚡雷暴法阵</b>、<b>❄️冰霜新星</b>等四大流派魔法！
+      升级可解锁<b>🔥火焰法典</b>、<b>⚡雷暴法阵</b>、<b>❄️冰霜新星</b>及<b>🐺暗夜小灰狼宠物</b>！<br>
+      <span style="color: #38bdf8;">提示：按下【空格键 Space】可瞬间将宠物召回身边护主！</span>
     </p>
     <button class="primary-btn" id="start-btn">开始战斗</button>
   </div>
@@ -245,28 +246,114 @@
   <canvas id="gameCanvas"></canvas>
 
   <script>
-    // 强制把核心启动函数声明在最前面，确保全局可见
-    window.startGame = function() {
-      try {
-        if (!audioCtx) {
-          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') {
-          audioCtx.resume();
-        }
-      } catch (e) {
-        console.log("音频初始化提示：", e);
+    // ==========================================
+    // 🐾 1. 宠物核心类（放在最顶部，并强制全局挂载）
+    // ==========================================
+    class Pet {
+      constructor(type, name) {
+        this.type = type;           
+        this.name = name;           
+        this.maxHp = 50;
+        this.hp = 50;
+        this.attack = 10;
+        this.attackRange = 40;      
+        this.speed = 3.5;           
+        this.isDead = false;
+        this.respawnTimer = 0;      
+        this.x = 0;
+        this.y = 0;
       }
 
-      initGame();
-      document.getElementById('start-screen').classList.add('hidden');
-      document.getElementById('gameover-screen').classList.add('hidden');
-      document.getElementById('levelup-screen').classList.add('hidden');
-      gameState = 'PLAYING';
-      lastTime = performance.now();
-      requestAnimationFrame(gameLoop);
-    };
+      update(player, enemies) {
+        if (this.isDead) {
+          if (this.respawnTimer > 0) {
+            this.respawnTimer -= 1 / 60; 
+          } else {
+            this.revive(player);
+          }
+          return;
+        }
 
+        let target = this.findNearestEnemy(enemies);
+        if (target) {
+          let dx = target.x - this.x;
+          let dy = target.y - this.y;
+          let dist = Math.hypot(dx, dy);
+
+          if (dist > this.attackRange) {
+            this.x += (dx / dist) * this.speed;
+            this.y += (dy / dist) * this.speed;
+          } else {
+            this.attackTarget(target);
+          }
+        } else {
+          let dx = player.x - this.x;
+          let dy = player.y - this.y;
+          let dist = Math.hypot(dx, dy);
+
+          if (dist > 80) {
+            this.x += (dx / dist) * this.speed;
+            this.y += (dy / dist) * this.speed;
+          }
+        }
+      }
+
+      findNearestEnemy(enemies) {
+        let nearest = null;
+        let minDist = Infinity;
+        for (let enemy of enemies) {
+          let dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+          if (dist < minDist) {
+            minDist = dist;
+            nearest = enemy;
+          }
+        }
+        return nearest;
+      }
+
+      attackTarget(target) {
+        target.hp -= this.attack;
+      }
+
+      takeDamage(amount) {
+        if (this.isDead) return;
+        this.hp -= amount;
+        if (this.hp <= 0) {
+          this.die();
+        }
+      }
+
+      die() {
+        this.isDead = true;
+        this.respawnTimer = 60; 
+        this.maxHp = 50;
+        this.hp = 0;
+        this.attack = 10;
+        console.log(`${this.name} 阵亡！培养属性已清零，60秒后复活。`);
+      }
+
+      revive(player) {
+        this.isDead = false;
+        this.hp = this.maxHp;
+        this.x = player.x + 20;
+        this.y = player.y + 20;
+        console.log(`${this.name} 已经复活！`);
+      }
+
+      recall(player) {
+        if (this.isDead) return;
+        this.x = player.x + 30;
+        this.y = player.y + 30;
+      }
+    }
+
+    // 确保全局作用域百分之百可访问
+    window.Pet = Pet;
+    let activePet = null;
+
+    // ==========================================
+    // 🎮 2. 游戏基础变量与配置
+    // ==========================================
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
@@ -364,7 +451,6 @@
       soundBtn.textContent = soundEnabled ? '🔊 音效: 开' : '🔇 音效: 关';
     });
 
-    // 游戏状态
     let gameState = 'START';
     let lastTime = 0;
     let elapsedTime = 0;
@@ -381,7 +467,14 @@
 
     // 输入控制
     const keys = {};
-    window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+    window.addEventListener('keydown', e => {
+      keys[e.key.toLowerCase()] = true;
+      // 空格键一键召回宠物
+      if (e.code === 'Space' && activePet) {
+        activePet.recall(player);
+        e.preventDefault();
+      }
+    });
     window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
     let joystick = { active: false, startX: 0, startY: 0, currX: 0, currY: 0, dx: 0, dy: 0 };
@@ -415,123 +508,7 @@
       joystick.dy = 0;
     });
 
-    <script>
-    // ==========================================
-    // 🐾 1. 把 Pet 类放在整个脚本的最顶端！
-    // ==========================================
-    class Pet {
-        constructor(type, name) {
-            this.type = type;           
-            this.name = name;           
-            this.maxHp = 50;
-            this.hp = 50;
-            this.attack = 10;
-            this.attackRange = 40;      
-            this.speed = 3.5;           
-            this.isDead = false;
-            this.respawnTimer = 0;      
-            this.x = 0;
-            this.y = 0;
-        }
-
-        update(player, enemies) {
-            if (this.isDead) {
-                if (this.respawnTimer > 0) {
-                    this.respawnTimer -= 1 / 60; 
-                } else {
-                    this.revive(player);
-                }
-                return;
-            }
-
-            let target = this.findNearestEnemy(enemies);
-            if (target) {
-                let dx = target.x - this.x;
-                let dy = target.y - this.y;
-                let dist = Math.hypot(dx, dy);
-
-                if (dist > this.attackRange) {
-                    this.x += (dx / dist) * this.speed;
-                    this.y += (dy / dist) * this.speed;
-                } else {
-                    this.attackTarget(target);
-                }
-            } else {
-                let dx = player.x - this.x;
-                let dy = player.y - this.y;
-                let dist = Math.hypot(dx, dy);
-
-                if (dist > 80) {
-                    this.x += (dx / dist) * this.speed;
-                    this.y += (dy / dist) * this.speed;
-                }
-            }
-        }
-
-        findNearestEnemy(enemies) {
-            let nearest = null;
-            let minDist = Infinity;
-            for (let enemy of enemies) {
-                let dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearest = enemy;
-                }
-            }
-            return nearest;
-        }
-
-        attackTarget(target) {
-            target.hp -= this.attack;
-        }
-
-        takeDamage(amount) {
-            if (this.isDead) return;
-            this.hp -= amount;
-            if (this.hp <= 0) {
-                this.die();
-            }
-        }
-
-        die() {
-            this.isDead = true;
-            this.respawnTimer = 60; 
-            this.maxHp = 50;
-            this.hp = 0;
-            this.attack = 10;
-        }
-
-        revive(player) {
-            this.isDead = false;
-            this.hp = this.maxHp;
-            this.x = player.x + 20;
-            this.y = player.y + 20;
-        }
-
-        recall(player) {
-            if (this.isDead) return;
-            this.x = player.x + 30;
-            this.y = player.y + 30;
-        }
-    }
-
-    // 🌟 这一行必须紧跟在 class Pet 下面，用来确保全局能调用
-    window.Pet = Pet;
-    let activePet = null;
-
-    // ==========================================
-    // 👇 2. 下面才是你原本写的所有游戏代码（包括 getAvailableUpgrades、主循环等）
-    // ==========================================
-    
-    // 你的其他代码从这里开始...
-    function getAvailableUpgrades() {
-        // ... 你的卡牌池（里面包含小灰狼卡牌） ...
-    }
-
-    // ... 其他游戏主循环、按键监听等代码 ...
-</script>
-    
-    // 动态生成升级卡牌池
+    // 动态生成升级卡牌池（已包含暗夜小灰狼宠物）
     function getAvailableUpgrades() {
       const pool = [
         {
@@ -638,9 +615,6 @@
             player.hp = Math.min(player.maxHp, player.hp + player.maxHp * 0.5);
           }
         },
-        // ==========================================
-        // 🐾 新增：暗夜小灰狼宠物召唤卡
-        // ==========================================
         {
           isSkill: true,
           badge: '✨ 解锁宠物',
@@ -648,14 +622,12 @@
           title: '暗夜小灰狼',
           desc: '召唤一只极速撕咬的近战暗夜灰狼。阵亡后需 60 秒复活且属性清零。',
           apply: () => {
-            // 如果玩家还没宠物，就直接实例化一只小灰狼
-            if (typeof activePet === 'undefined' || !activePet) {
+            if (!activePet) {
               activePet = new Pet('wolf', '暗夜小灰狼');
               activePet.x = player.x + 20;
               activePet.y = player.y + 20;
               console.log("成功召唤：暗夜小灰狼！");
             } else {
-              // 如果已经有了，可以升级宠物的攻击力或血量（后面我们还可以扩展宠物升级逻辑）
               activePet.attack += 5;
               activePet.maxHp += 20;
               activePet.hp += 20;
@@ -668,6 +640,9 @@
     }
 
     function initGame() {
+      // 每次开始新游戏时重置宠物实例
+      activePet = null;
+
       player = {
         x: canvas.width / 2,
         y: canvas.height / 2,
@@ -723,7 +698,6 @@
       updateHUD();
     }
 
-    // 绑定开始按钮事件（使用安全的事件监听，确保100%响应点击）
     document.getElementById('start-btn').addEventListener('click', startGame);
     document.getElementById('restart-btn').addEventListener('click', startGame);
 
@@ -858,6 +832,11 @@
       player.y = Math.max(player.radius + 55, Math.min(canvas.height - player.radius, player.y));
 
       if (player.invulnTimer > 0) player.invulnTimer -= dt;
+
+      // 更新宠物 AI
+      if (activePet) {
+        activePet.update(player, enemies);
+      }
 
       // 技能1：奥术飞弹
       player.fireTimer -= dt;
@@ -1039,12 +1018,145 @@
       }
       for (let i = frostWaves.length - 1; i >= 0; i--) {
         const fw = frostWaves[i];
+        fw.radius += (fw.maxRadius - fw.radius) * 12 * dt;
         fw.life -= dt;
-        fw.radius += (fw.maxRadius / 0.35) * dt;
         if (fw.life <= 0) frostWaves.splice(i, 1);
       }
+    }
 
-      updateHUD();
+    function draw() {
+      ctx.fillStyle = '#12151f';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 绘制网格背景
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+      ctx.lineWidth = 1;
+      const gridSize = 60;
+      const offsetX = - (player.x || 0) % gridSize;
+      const offsetY = - (player.y || 0) % gridSize;
+      ctx.beginPath();
+      for (let x = offsetX; x < canvas.width; x += gridSize) {
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+      }
+      for (let y = offsetY; y < canvas.height; y += gridSize) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+      }
+      ctx.stroke();
+
+      // 绘制宝石
+      for (const g of gems) {
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.arc(g.x, g.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 绘制子弹
+      for (const b of bullets) {
+        ctx.fillStyle = '#60a5fa';
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 绘制火焰法典环绕火球
+      if (player.skills.fireOrb > 0) {
+        for (let i = 0; i < player.fireOrbCount; i++) {
+          const angle = player.fireOrbAngle + (Math.PI * 2 / player.fireOrbCount) * i;
+          const orbX = player.x + Math.cos(angle) * player.fireOrbRadius;
+          const orbY = player.y + Math.sin(angle) * player.fireOrbRadius;
+          ctx.fillStyle = '#f97316';
+          ctx.beginPath();
+          ctx.arc(orbX, orbY, 11, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // 绘制敌人
+      for (const e of enemies) {
+        ctx.fillStyle = e.hitFlash > 0 ? '#ffffff' : e.color;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 史莱姆眼睛
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(e.x - 4, e.y - 3, 2, 0, Math.PI * 2);
+        ctx.arc(e.x + 4, e.y - 3, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 绘制雷击特效
+      for (const l of lightnings) {
+        ctx.strokeStyle = '#facc15';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(l.x, l.y - 120);
+        ctx.lineTo(l.x + (Math.random() - 0.5) * 15, l.y);
+        ctx.stroke();
+      }
+
+      // 绘制冰霜冲击波
+      for (const fw of frostWaves) {
+        ctx.strokeStyle = `rgba(56, 189, 248, ${fw.life * 2.5})`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(fw.x, fw.y, fw.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 绘制粒子
+      for (const p of particles) {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life / p.maxLife;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+      }
+
+      // 🐾 绘制宠物（小灰狼）
+      if (activePet) {
+        if (activePet.isDead) {
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
+          ctx.font = '11px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(`🐺 复活中: ${Math.ceil(activePet.respawnTimer)}s`, player.x, player.y - 28);
+        } else {
+          ctx.fillStyle = '#94a3b8'; // 灰狼身体
+          ctx.beginPath();
+          ctx.arc(activePet.x, activePet.y, 11, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#f8fafc';
+          ctx.font = '10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('🐺 小灰狼', activePet.x, activePet.y - 15);
+        }
+      }
+
+      // 绘制玩家（魔法师）
+      ctx.fillStyle = player.invulnTimer > 0 && Math.floor(Date.now() / 60) % 2 === 0 ? '#93c5fd' : '#3b82f6';
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 魔法师法帽顶饰
+      ctx.fillStyle = '#1d4ed8';
+      ctx.beginPath();
+      ctx.arc(player.x, player.y - 6, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 玩家血条
+      const barWidth = 36;
+      const barHeight = 5;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(player.x - barWidth / 2, player.y + player.radius + 6, barWidth, barHeight);
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(player.x - barWidth / 2, player.y + player.radius + 6, barWidth * (player.hp / player.maxHp), barHeight);
     }
 
     function formatTime(sec) {
@@ -1054,372 +1166,44 @@
     }
 
     function updateHUD() {
-      const pct = Math.min(100, (player.xp / player.nextXp) * 100);
-      xpFill.style.width = `${pct}%`;
+      xpFill.style.width = `${(player.xp / player.nextXp) * 100}%`;
       levelText.textContent = `Lv.${player.level}`;
-      timeText.textContent = formatTime(elapsedTime);
       killText.textContent = `击杀: ${kills}`;
 
-      let tagsHtml = `<span class="skill-tag">🔮 Lv.${player.skills.missile}</span>`;
-      if (player.skills.fireOrb > 0) tagsHtml += `<span class="skill-tag">🔥 Lv.${player.skills.fireOrb}</span>`;
-      if (player.skills.thunder > 0) tagsHtml += `<span class="skill-tag">⚡ Lv.${player.skills.thunder}</span>`;
-      if (player.skills.frost > 0) tagsHtml += `<span class="skill-tag">❄️ Lv.${player.skills.frost}</span>`;
-      skillsBar.innerHTML = tagsHtml;
-    }
-
-    function render() {
-      ctx.fillStyle = '#12151f';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
-      ctx.lineWidth = 1;
-      const gridSize = 48;
-      for (let x = 0; x < canvas.width; x += gridSize) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      skillsBar.innerHTML = '';
+      if (player.skills.missile > 0) {
+        skillsBar.innerHTML += `<span class="skill-tag">🔮 奥术 Lv.${player.skills.missile}</span>`;
       }
-      for (let y = 0; y < canvas.height; y += gridSize) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-      }
-
-      for (const fw of frostWaves) {
-        ctx.save();
-        ctx.strokeStyle = `rgba(56, 189, 248, ${fw.life / 0.35})`;
-        ctx.fillStyle = `rgba(56, 189, 248, ${(fw.life / 0.35) * 0.15})`;
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(fw.x, fw.y, fw.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      for (const g of gems) {
-        ctx.fillStyle = '#34d399';
-        ctx.beginPath();
-        ctx.moveTo(g.x, g.y - 6);
-        ctx.lineTo(g.x + 5, g.y);
-        ctx.lineTo(g.x, g.y + 6);
-        ctx.lineTo(g.x - 5, g.y);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      for (const e of enemies) {
-        let fill = e.color;
-        if (e.hitFlash > 0) fill = '#ffffff';
-        else if (e.slowTimer > 0) fill = '#38bdf8';
-
-        ctx.fillStyle = fill;
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, e.radius, Math.PI, 0);
-        ctx.quadraticCurveTo(e.x + e.radius, e.y + e.radius * 0.9, e.x, e.y + e.radius * 0.9);
-        ctx.quadraticCurveTo(e.x - e.radius, e.y + e.radius * 0.9, e.x - e.radius, e.y);
-        ctx.fill();
-
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.arc(e.x - e.radius * 0.32, e.y - 1, 2.5, 0, Math.PI * 2);
-        ctx.arc(e.x + e.radius * 0.32, e.y - 1, 2.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      for (const b of bullets) {
-        ctx.fillStyle = '#38bdf8';
-        ctx.shadowColor = '#38bdf8';
-        ctx.shadowBlur = 10;
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-      }
-
       if (player.skills.fireOrb > 0) {
-        for (let i = 0; i < player.fireOrbCount; i++) {
-          const angle = player.fireOrbAngle + (Math.PI * 2 / player.fireOrbCount) * i;
-          const orbX = player.x + Math.cos(angle) * player.fireOrbRadius;
-          const orbY = player.y + Math.sin(angle) * player.fireOrbRadius;
-
-          ctx.fillStyle = '#f97316';
-          ctx.shadowColor = '#ea580c';
-          ctx.shadowBlur = 14;
-          ctx.beginPath();
-          ctx.arc(orbX, orbY, 10, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.fillStyle = '#fef08a';
-          ctx.beginPath();
-          ctx.arc(orbX, orbY, 5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.shadowBlur = 0;
-        }
+        skillsBar.innerHTML += `<span class="skill-tag">🔥 火焰 Lv.${player.skills.fireOrb}</span>`;
       }
-
-      for (const l of lightnings) {
-        ctx.save();
-        ctx.strokeStyle = `rgba(250, 204, 21, ${l.life / l.maxLife})`;
-        ctx.lineWidth = 4;
-        ctx.shadowColor = '#facc15';
-        ctx.shadowBlur = 15;
-        ctx.beginPath();
-        ctx.moveTo(l.x + (Math.random() - 0.5) * 30, 0);
-        ctx.lineTo(l.x - 12, l.y * 0.45);
-        ctx.lineTo(l.x + 14, l.y * 0.72);
-        ctx.lineTo(l.x, l.y);
-        ctx.stroke();
-        ctx.restore();
+      if (player.skills.thunder > 0) {
+        skillsBar.innerHTML += `<span class="skill-tag">⚡ 雷暴 Lv.${player.skills.thunder}</span>`;
       }
-
-      for (const p of particles) {
-        ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
-        ctx.fillStyle = p.color;
-        ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+      if (player.skills.frost > 0) {
+        skillsBar.innerHTML += `<span class="skill-tag">❄️ 冰霜 Lv.${player.skills.frost}</span>`;
       }
-      ctx.globalAlpha = 1;
-
-      ctx.save();
-      if (player.invulnTimer > 0 && Math.floor(player.invulnTimer * 20) % 2 === 0) {
-        ctx.globalAlpha = 0.45;
-      }
-      ctx.fillStyle = '#6366f1';
-      ctx.beginPath();
-      ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#a855f7';
-      ctx.beginPath();
-      ctx.moveTo(player.x - 16, player.y - 8);
-      ctx.lineTo(player.x + 16, player.y - 8);
-      ctx.lineTo(player.x, player.y - 28);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-
-      const hpWidth = 36;
-      const hpPct = Math.max(0, player.hp / player.maxHp);
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(player.x - hpWidth / 2, player.y + player.radius + 8, hpWidth, 5);
-      ctx.fillStyle = hpPct > 0.35 ? '#22c55e' : '#ef4444';
-      ctx.fillRect(player.x - hpWidth / 2, player.y + player.radius + 8, hpWidth * hpPct, 5);
-
-      if (joystick.active) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(joystick.startX, joystick.startY, 45, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.fillStyle = 'rgba(56, 189, 248, 0.45)';
-        ctx.beginPath();
-        ctx.arc(joystick.currX, joystick.currY, 18, 0, Math.PI * 2);
-        ctx.fill();
+      // 如果拥有宠物，在 HUD 上也展示出来
+      if (activePet) {
+        const petStatusText = activePet.isDead ? `(复活中 ${Math.ceil(activePet.respawnTimer)}s)` : `(HP: ${Math.round(activePet.hp)})`;
+        skillsBar.innerHTML += `<span class="skill-tag" style="border-color: rgba(250,204,21,0.5); color: #fde047;">🐺 灰狼 ${petStatusText}</span>`;
       }
     }
 
     function gameLoop(timestamp) {
       if (gameState !== 'PLAYING') return;
+
       const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
       lastTime = timestamp;
+
       update(dt);
-      render();
-      if (gameState === 'PLAYING') requestAnimationFrame(gameLoop);
+      draw();
+
+      timeText.textContent = formatTime(elapsedTime);
+      updateHUD();
+
+      requestAnimationFrame(gameLoop);
     }
   </script>
 </body>
 </html>
-
-// ==========================================
-// 1. 宠物核心类
-// ==========================================
-class Pet {
-    constructor(type, name) {
-        this.type = type;           // 宠物类型: 'wolf', 'mech', 'tank', 'fire'
-        this.name = name;           // 宠物名称
-        
-        // 基础属性
-        this.maxHp = 50;
-        this.hp = 50;
-        this.attack = 10;
-        this.attackRange = 40;      // 近战攻击距离
-        this.speed = 3.5;           // 移动速度
-        
-        // 状态控制
-        this.isDead = false;
-        this.respawnTimer = 0;      // 复活倒计时（秒）
-        
-        // 初始坐标
-        this.x = 0;
-        this.y = 0;
-    }
-
-    // 核心更新循环（在主循环中调用）
-    update(player, enemies) {
-        if (this.isDead) {
-            if (this.respawnTimer > 0) {
-                this.respawnTimer -= 1 / 60; // 假设每秒60帧
-            } else {
-                this.revive(player);
-            }
-            return;
-        }
-
-        // 寻找最近的敌人
-        let target = this.findNearestEnemy(enemies);
-
-        if (target) {
-            let dx = target.x - this.x;
-            let dy = target.y - this.y;
-            let dist = Math.hypot(dx, dy);
-
-            if (dist > this.attackRange) {
-                this.x += (dx / dist) * this.speed;
-                this.y += (dy / dist) * this.speed;
-            } else {
-                this.attackTarget(target);
-            }
-        } else {
-            // 没有敌人时跟随玩家
-            let dx = player.x - this.x;
-            let dy = player.y - this.y;
-            let dist = Math.hypot(dx, dy);
-
-            if (dist > 80) {
-                this.x += (dx / dist) * this.speed;
-                this.y += (dy / dist) * this.speed;
-            }
-        }
-    }
-
-    findNearestEnemy(enemies) {
-        let nearest = null;
-        let minDist = Infinity;
-        for (let enemy of enemies) {
-            let dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
-            if (dist < minDist) {
-                minDist = dist;
-                nearest = enemy;
-            }
-        }
-        return nearest;
-    }
-
-    attackTarget(target) {
-        target.hp -= this.attack;
-    }
-
-    takeDamage(amount) {
-        if (this.isDead) return;
-        this.hp -= amount;
-        if (this.hp <= 0) {
-            this.die();
-        }
-    }
-
-    // 阵亡：清空所有培养信息并进入 60 秒复活冷却
-    die() {
-        this.isDead = true;
-        this.respawnTimer = 60; 
-        this.maxHp = 50;
-        this.hp = 0;
-        this.attack = 10;
-        console.log(`${this.name} 阵亡！培养属性已清零，60秒后复活。`);
-    }
-
-    revive(player) {
-        this.isDead = false;
-        this.hp = this.maxHp;
-        this.x = player.x + 20;
-        this.y = player.y + 20;
-        console.log(`${this.name} 已经复活！`);
-    }
-
-    // 空格键一键召回护主
-    recall(player) {
-        if (this.isDead) return;
-        this.x = player.x + 30;
-        this.y = player.y + 30;
-    }
-}
-
-// 全局当前激活的宠物实例
-let activePet = null;
-
-              // ==========================================
-// 2. 卡牌/技能池配置
-// ==========================================
-const skillCardsPool = [
-    {
-        id: 'pet_wolf',
-        name: '召唤：暗夜小灰狼',
-        type: 'pet',
-        desc: '获得一只极速撕咬的近战小灰狼。阵亡后需 60 秒复活且属性清零。',
-        onSelect: (player) => {
-            activePet = new Pet('wolf', '暗夜小灰狼');
-            activePet.x = player.x + 20;
-            activePet.y = player.y + 20;
-        }
-    },
-    {
-        id: 'pet_mech',
-        name: '召唤：铁拳机械卫士',
-        type: 'pet',
-        desc: '获得一台重拳开路、能击退敌人的机械卫士。',
-        onSelect: (player) => {
-            activePet = new Pet('mech', '铁拳机械卫士');
-            activePet.x = player.x + 20;
-            activePet.y = player.y + 20;
-        }
-    },
-    {
-        id: 'pet_tank',
-        name: '召唤：荆棘重甲兽',
-        type: 'pet',
-        desc: '获得一只超高血量、能为主分担伤害的重甲兽。',
-        onSelect: (player) => {
-            activePet = new Pet('tank', '荆棘重甲兽');
-            activePet.x = player.x + 20;
-            activePet.y = player.y + 20;
-        }
-    }
-];
-
-              // ==========================================
-// 3. 键盘交互（空格召回）
-// ==========================================
-window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && activePet) {
-        activePet.recall(player); // player 是你的主角对象
-        e.preventDefault();       // 防止网页滚动
-    }
-});
-
-              // ==========================================
-// 4. 在主循环中更新与渲染
-// ==========================================
-function gameLoop() {
-    // --- 步骤 A：更新逻辑 ---
-    if (activePet) {
-        activePet.update(player, enemies);
-    }
-
-    // --- 步骤 B：画面渲染 (Canvas 示例) ---
-    // ctx.clearRect(...) 之后绘制宠物
-    if (activePet) {
-        if (activePet.isDead) {
-            // 阵亡状态：在屏幕某个角落或玩家头顶显示复活倒计时
-            ctx.fillStyle = "red";
-            ctx.font = "12px sans-serif";
-            ctx.fillText(`宠物复活中: ${Math.ceil(activePet.respawnTimer)}s`, player.x - 30, player.y - 30);
-        } else {
-            // 存活状态：绘制宠物小圆圈及名字
-            ctx.fillStyle = "darkgray";
-            ctx.beginPath();
-            ctx.arc(activePet.x, activePet.y, 10, 0, Math.PI * 2);
-            ctx.fill();
-
-            // 宠物名字与血量
-            ctx.fillStyle = "white";
-            ctx.font = "10px sans-serif";
-            ctx.fillText(`${activePet.name} (${activePet.hp}/${activePet.maxHp})`, activePet.x - 25, activePet.y - 15);
-        }
-    }
-
-    requestAnimationFrame(gameLoop);
-}
