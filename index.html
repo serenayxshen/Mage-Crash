@@ -1196,8 +1196,8 @@
           ctx.textAlign = 'center';
           ctx.fillText(`🐺 复活中: ${Math.ceil(activePet.respawnTimer)}s`, player.x, player.y - 28);
         } else {
-          // 1. 绘制小灰狼身体
-          ctx.fillStyle = '#94a3b8';
+          // 1. 绘制小灰狼身体（无敌期间闪烁白灰色）
+          ctx.fillStyle = (activePet.invulnTimer > 0 && Math.floor(Date.now() / 60) % 2 === 0) ? '#e2e8f0' : '#94a3b8';
           ctx.beginPath();
           ctx.arc(activePet.x, activePet.y, 11, 0, Math.PI * 2);
           ctx.fill();
