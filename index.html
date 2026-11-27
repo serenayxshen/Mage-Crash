@@ -247,7 +247,7 @@
 
   <script>
     // ==========================================
-    // 🐾 1. 宠物核心类（放在最顶部，并强制全局挂载）
+    // 🐾 1. 宠物核心类（定义在脚本最顶端，挂载到 window）
     // ==========================================
     class Pet {
       constructor(type, name) {
@@ -347,7 +347,6 @@
       }
     }
 
-    // 确保全局作用域百分之百可访问
     window.Pet = Pet;
     let activePet = null;
 
@@ -469,7 +468,6 @@
     const keys = {};
     window.addEventListener('keydown', e => {
       keys[e.key.toLowerCase()] = true;
-      // 空格键一键召回宠物
       if (e.code === 'Space' && activePet) {
         activePet.recall(player);
         e.preventDefault();
@@ -508,7 +506,7 @@
       joystick.dy = 0;
     });
 
-    // 动态生成升级卡牌池（已包含暗夜小灰狼宠物）
+    // 动态生成升级卡牌池
     function getAvailableUpgrades() {
       const pool = [
         {
@@ -640,7 +638,6 @@
     }
 
     function initGame() {
-      // 每次开始新游戏时重置宠物实例
       activePet = null;
 
       player = {
@@ -1126,7 +1123,7 @@
           ctx.textAlign = 'center';
           ctx.fillText(`🐺 复活中: ${Math.ceil(activePet.respawnTimer)}s`, player.x, player.y - 28);
         } else {
-          ctx.fillStyle = '#94a3b8'; // 灰狼身体
+          ctx.fillStyle = '#94a3b8';
           ctx.beginPath();
           ctx.arc(activePet.x, activePet.y, 11, 0, Math.PI * 2);
           ctx.fill();
@@ -1183,7 +1180,6 @@
       if (player.skills.frost > 0) {
         skillsBar.innerHTML += `<span class="skill-tag">❄️ 冰霜 Lv.${player.skills.frost}</span>`;
       }
-      // 如果拥有宠物，在 HUD 上也展示出来
       if (activePet) {
         const petStatusText = activePet.isDead ? `(复活中 ${Math.ceil(activePet.respawnTimer)}s)` : `(HP: ${Math.round(activePet.hp)})`;
         skillsBar.innerHTML += `<span class="skill-tag" style="border-color: rgba(250,204,21,0.5); color: #fde047;">🐺 灰狼 ${petStatusText}</span>`;
