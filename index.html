@@ -262,9 +262,13 @@
         this.respawnTimer = 0;      
         this.x = 0;
         this.y = 0;
+        this.invulnTimer = 0;
       }
 
       update(player, enemies) {
+        if (this.invulnTimer > 0) {
+          this.invulnTimer -= 1 / 60; // 🌟 新增：无敌时间递减
+        }
         if (this.isDead) {
           if (this.respawnTimer > 0) {
             this.respawnTimer -= 1 / 60; 
