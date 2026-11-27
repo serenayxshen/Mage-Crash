@@ -882,6 +882,10 @@
             });
           }
           playSound('shoot');
+          
+          // 🌟 核心新增：玩家每次发射飞弹时，在脚下/身旁爆开一团蓝色的奥术施法粒子！
+          spawnParticles(player.x, player.y, '#3b82f6', 5);
+
           player.fireTimer = player.fireCooldown;
         }
       }
