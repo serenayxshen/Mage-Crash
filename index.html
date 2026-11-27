@@ -1116,6 +1116,7 @@
       }
 
       // 🐾 绘制宠物（小灰狼）
+      // 🐾 绘制宠物（小灰狼及血条）
       if (activePet) {
         if (activePet.isDead) {
           ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
@@ -1123,15 +1124,28 @@
           ctx.textAlign = 'center';
           ctx.fillText(`🐺 复活中: ${Math.ceil(activePet.respawnTimer)}s`, player.x, player.y - 28);
         } else {
+          // 1. 绘制小灰狼身体
           ctx.fillStyle = '#94a3b8';
           ctx.beginPath();
           ctx.arc(activePet.x, activePet.y, 11, 0, Math.PI * 2);
           ctx.fill();
 
+          // 2. 绘制小灰狼名字
           ctx.fillStyle = '#f8fafc';
           ctx.font = '10px sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText('🐺 小灰狼', activePet.x, activePet.y - 15);
+          ctx.fillText('🐺 小灰狼', activePet.x, activePet.y - 22);
+
+          // 3. 🌟 绘制小灰狼专属血条
+          const petBarWidth = 28;
+          const petBarHeight = 4;
+          // 血条背景（黑色半透明）
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          ctx.fillRect(activePet.x - petBarWidth / 2, activePet.y + 14, petBarWidth, petBarHeight);
+          // 当前血量（绿色/黄色）
+          ctx.fillStyle = '#22c55e';
+          const hpPercent = Math.max(0, activePet.hp / activePet.maxHp);
+          ctx.fillRect(activePet.x - petBarWidth / 2, activePet.y + 14, petBarWidth * hpPercent, petBarHeight);
         }
       }
 
