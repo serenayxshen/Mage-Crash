@@ -1201,8 +1201,9 @@
         skillsBar.innerHTML += `<span class="skill-tag">❄️ 冰霜 Lv.${player.skills.frost}</span>`;
       }
       if (activePet) {
-        const petStatusText = activePet.isDead ? `(复活中 ${Math.ceil(activePet.respawnTimer)}s)` : `(HP: ${Math.round(activePet.hp)})`;
-        skillsBar.innerHTML += `<span class="skill-tag" style="border-color: rgba(250,204,21,0.5); color: #fde047;">🐺 灰狼 ${petStatusText}</span>`;
+        const petLevel = activePet.level || 1;
+        const petStatusText = activePet.isDead ? `(复活中 ${Math.ceil(activePet.respawnTimer)}s)` : `(Lv.${petLevel})`;
+        skillsBar.innerHTML += `<span class="skill-tag" style="border-color: rgba(250,204,21,0.5); color: #fde047;">🐺 小灰狼 ${petStatusText}</span>`;
       }
     }
 
