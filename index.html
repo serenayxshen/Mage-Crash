@@ -615,21 +615,27 @@
         },
         {
           isSkill: true,
-          badge: '✨ 解锁宠物',
+          badge: !activePet ? '✨ 解锁宠物' : `🐺 灰狼强化 Lv.${(activePet.level || 1) + 1}`,
           icon: '🐺',
-          title: '暗夜小灰狼',
-          desc: '召唤一只极速撕咬的近战暗夜灰狼。阵亡后需 60 秒复活且属性清零。',
+          title: !activePet ? '暗夜小灰狼' : '暗夜小灰狼·晋升',
+          desc: !activePet 
+            ? '召唤一只极速撕咬的近战暗夜灰狼。阵亡后需 60 秒复活且属性清零。'
+            : '小灰狼吞噬魔力进化：攻击力 +6，最大生命 +30 并瞬间回满血！',
           apply: () => {
             if (!activePet) {
+              // 第一次获得：初始化宠物，并记录等级为 1
               activePet = new Pet('wolf', '暗夜小灰狼');
+              activePet.level = 1;
               activePet.x = player.x + 20;
               activePet.y = player.y + 20;
-              console.log("成功召唤：暗夜小灰狼！");
+              console.log("成功召唤：暗夜小灰狼 Lv.1！");
             } else {
-              activePet.attack += 5;
-              activePet.maxHp += 20;
-              activePet.hp += 20;
-              console.log("小灰狼得到强化！攻击力提高。");
+              // 已经拥有：提升等级，增加攻击和血量上限，并回满当前血量
+              activePet.level = (activePet.level || 1) + 1;
+              activePet.attack += 6;
+              activePet.maxHp += 30;
+              activePet.hp = activePet.maxHp; // 升级瞬间回满血！
+              console.log(`小灰狼升级至 Lv.${activePet.level}！当前攻击：${activePet.attack}，最大生命：${activePet.maxHp}`);
             }
           }
         }
