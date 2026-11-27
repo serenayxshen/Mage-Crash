@@ -968,12 +968,33 @@
         if (e.slowTimer > 0) e.slowTimer -= dt;
 
         const speedFactor = e.slowTimer > 0 ? 0.4 : 1.0;
-        const angle = Math.atan2(player.y - e.y, player.x - e.x);
+
+        // 🌟 1. 仇恨判定：检查小灰狼是否存活且在附近
+        let targetX = player.x;
+        let targetY = player.y;
+        let targetRadius = player.radius;
+
+        if (activePet && !activePet.isDead) {
+          let distToPlayer = Math.hypot(player.x - e.x, player.y - e.y);
+          let distToPet = Math.hypot(activePet.x - e.x, activePet.y - e.y);
+
+          // 如果小灰狼离怪物更近（比如距离小于 120 像素），怪物就会把仇恨转移到小灰狼身上！
+          if (distToPet < 120 && distToPet < distToPlayer) {
+            targetX = activePet.x;
+            targetY = activePet.y;
+            targetRadius = 11; // 小灰狼的碰撞半径
+          }
+        }
+
+        // 🌟 2. 怪物朝选中的仇恨目标（玩家或小灰狼）移动
+        const angle = Math.atan2(targetY - e.y, targetX - e.x);
         e.x += Math.cos(angle) * e.speed * speedFactor * dt;
         e.y += Math.sin(angle) * e.speed * speedFactor * dt;
 
-        const dist = Math.hypot(player.x - e.x, player.y - e.y);
-        if (dist < player.radius + e.radius) {
+        // 3. 伤害判定：不仅能咬玩家，如果贴脸了也能对小灰狼造成伤害！
+        // 判定与玩家的碰撞
+        const distPlayer = Math.hypot(player.x - e.x, player.y - e.y);
+        if (distPlayer < player.radius + e.radius) {
           if (player.invulnTimer <= 0) {
             player.hp -= 12;
             player.invulnTimer = 0.45;
@@ -985,6 +1006,21 @@
             }
           }
         }
+
+        // 🌟 判定与小灰狼的碰撞（怪物攻击小灰狼！）
+        if (activePet && !activePet.isDead) {
+          const distPet = Math.hypot(activePet.x - e.x, activePet.y - e.y);
+          if (distPet < 11 + e.radius) {
+            // 给小灰狼扣血（每帧扣一点或者带冷却，这里做个简单平滑扣血）
+            // 我们用 e.petHitCooldown 确保小灰狼不会被瞬间秒杀，每 0.8 秒被咬一次
+            if (!e.petHitCooldown || e.petHitCooldown <= 0) {
+              activePet.takeDamage(8); // 怪物每次咬小灰狼 8 点血
+              e.petHitCooldown = 0.8;
+              spawnParticles(activePet.x, activePet.y, '#ef4444', 3); // 小灰狼受伤掉血特效
+            }
+          }
+        }
+        if (e.petHitCooldown > 0) e.petHitCooldown -= dt;
       }
 
       for (let i = gems.length - 1; i >= 0; i--) {
