@@ -999,19 +999,29 @@
         const angle = Math.atan2(targetY - e.y, targetX - e.x);
         e.x += Math.cos(angle) * e.speed * speedFactor * dt;
         e.y += Math.sin(angle) * e.speed * speedFactor * dt;
-
-        // 3. 伤害判定：不仅能咬玩家，如果贴脸了也能对小灰狼造成伤害！
+        
         // 判定与玩家的碰撞
         const distPlayer = Math.hypot(player.x - e.x, player.y - e.y);
         if (distPlayer < player.radius + e.radius) {
           if (player.invulnTimer <= 0) {
-            player.hp -= 12;
+            player.hp -= (e.damageToPlayer || 12); // 🌟 使用差异化伤害
             player.invulnTimer = 0.45;
             spawnParticles(player.x, player.y, '#ef4444', 6);
             if (player.hp <= 0) {
               gameState = 'GAMEOVER';
               finalStats.textContent = `存活时间: ${formatTime(elapsedTime)} | 击杀史莱姆: ${kills}`;
               gameoverScreen.classList.remove('hidden');
+            }
+          }
+        }
+
+        // 🌟 判定与小灰狼的碰撞（受宠物自身 invulnTimer 保护，不再被瞬间围殴秒杀）
+        if (activePet && !activePet.isDead) {
+          const distPet = Math.hypot(activePet.x - e.x, activePet.y - e.y);
+          if (distPet < 11 + e.radius) {
+            if (activePet.invulnTimer <= 0) {
+              activePet.takeDamage(e.damageToPet || 8); // 🌟 使用差异化伤害
+              spawnParticles(activePet.x, activePet.y, '#ef4444', 3);
             }
           }
         }
