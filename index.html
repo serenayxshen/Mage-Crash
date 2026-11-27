@@ -324,8 +324,9 @@
       }
 
       takeDamage(amount) {
-        if (this.isDead) return;
+        if (this.isDead || this.invulnTimer > 0) return;
         this.hp -= amount;
+        this.invulnTimer = 0.45;
         if (this.hp <= 0) {
           this.die();
         }
