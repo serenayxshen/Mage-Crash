@@ -345,8 +345,8 @@
 
       recall(player) {
         if (this.isDead) return;
-        this.x = player.x + 30;
-        this.y = player.y + 30;
+        this.x = player.x; // 直接和玩家 X 坐标重叠
+        this.y = player.y; // 直接和玩家 Y 坐标重叠
       }
     }
 
