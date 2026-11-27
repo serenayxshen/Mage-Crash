@@ -253,11 +253,11 @@
       constructor(type, name) {
         this.type = type;           
         this.name = name;           
-        this.maxHp = 50;
-        this.hp = 50;
-        this.attack = 10;
+        this.maxHp = 120;
+        this.hp = 120;
+        this.attack = 15;
         this.attackRange = 40;      
-        this.speed = 3.5;           
+        this.speed = 3.0;           
         this.isDead = false;
         this.respawnTimer = 0;      
         this.x = 0;
@@ -311,11 +311,12 @@
         return nearest;
       }
 
-      attackTarget(target) {
+     attackTarget(target) {
         target.hp -= this.attack;
-        target.hitFlash = 0.08; // 让被咬的敌人也产生受击闪白！
-        // 🌟 每次小灰狼咬中敌人，产生橘红色的撕咬特效粒子
+        target.hitFlash = 0.08;
         spawnParticles(this.x, this.y, '#f97316', 3);
+        // 🌟 吸血机制：每次攻击命中敌人，小灰狼回复 3 点血！
+        this.hp = Math.min(this.maxHp, this.hp + 3);
       }
 
       takeDamage(amount) {
